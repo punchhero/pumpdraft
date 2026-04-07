@@ -71,8 +71,15 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
   const filtered = tokens.filter(
     (t) =>
       t.symbol.toLowerCase().includes(search.toLowerCase()) ||
-      t.name.toLowerCase().includes(search.toLowerCase())
+      t.name.toLowerCase().includes(search.toLowerCase()) ||
+      t.address.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleCopy = (e: React.MouseEvent, address: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(address);
+    alert(`Copied Contract Address: \n${address}`);
+  };
 
   const embedUrl = selected
     ? `https://dexscreener.com/solana/${selected.address}?embed=1&theme=dark&info=0&trades=0`
@@ -154,9 +161,16 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
                 <span className="chart-token-symbol">${token.symbol}</span>
                 <span className="chart-token-name">{token.name}</span>
               </span>
-              <span className="chart-token-stats">
+              <span className="chart-token-stats flex items-center gap-2">
                 <span className="chart-token-mcap">{formatMcap(token.usd_market_cap)}</span>
                 <span className="chart-token-age">{formatAge(token.age_hours)}</span>
+                <button 
+                  onClick={(e) => handleCopy(e, token.address)}
+                  className="ml-2 hover:text-terminal-green transition-colors text-[10px] text-terminal-green-dark border border-terminal-green-dark px-1 rounded"
+                  title="Copy Contract Address"
+                >
+                  📋
+                </button>
               </span>
             </button>
           ))}
