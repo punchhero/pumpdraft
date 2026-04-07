@@ -9,8 +9,9 @@ const MIN_AGE_SECONDS = MIN_AGE_HOURS * 60 * 60;
 
 export async function GET() {
   try {
-    // Fetch top tokens by market cap from pump.fun
-    const url = `${PUMP_API}?offset=0&limit=200&sort=market_cap&order=DESC&includeNsfw=false`;
+    // Fetch top tokens by market cap from pump.fun (routed via a public proxy to bypass Vercel IP blocking)
+    const rawUrl = `${PUMP_API}?offset=0&limit=200&sort=market_cap&order=DESC&includeNsfw=false`;
+    const url = `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`;
 
     const res = await fetch(url, {
       headers: {
