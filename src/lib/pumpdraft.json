@@ -1,0 +1,98 @@
+{
+  "version": "0.1.0",
+  "name": "pumpdraft",
+  "instructions": [
+    {
+      "name": "initializeMarket",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "marketId", "type": "u64" },
+        { "name": "tokenMint", "type": "publicKey" },
+        { "name": "strikePrice", "type": "u64" },
+        { "name": "resolutionTimestamp", "type": "i64" }
+      ]
+    },
+    {
+      "name": "makePrediction",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "prediction", "isMut": true, "isSigner": false },
+        { "name": "user", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "marketId", "type": "u64" },
+        { "name": "isUp", "type": "bool" },
+        { "name": "amount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "settleMarket",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "authority", "isMut": true, "isSigner": true }
+      ],
+      "args": [
+        { "name": "finalPrice", "type": "u64" }
+      ]
+    },
+    {
+      "name": "claimWinnings",
+      "accounts": [
+        { "name": "market", "isMut": true, "isSigner": false },
+        { "name": "prediction", "isMut": true, "isSigner": false },
+        { "name": "user", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "MarketState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "creator", "type": "publicKey" },
+          { "name": "marketId", "type": "u64" },
+          { "name": "tokenMint", "type": "publicKey" },
+          { "name": "strikePrice", "type": "u64" },
+          { "name": "finalPrice", "type": "u64" },
+          { "name": "resolutionTimestamp", "type": "i64" },
+          { "name": "totalUpStake", "type": "u64" },
+          { "name": "totalDownStake", "type": "u64" },
+          { "name": "totalPlayers", "type": "u64" },
+          { "name": "outcome", "type": "u8" },
+          { "name": "isResolved", "type": "bool" },
+          { "name": "marketBump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "PredictionState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "user", "type": "publicKey" },
+          { "name": "marketId", "type": "u64" },
+          { "name": "amount", "type": "u64" },
+          { "name": "isUp", "type": "bool" },
+          { "name": "hasClaimed", "type": "bool" }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "MarketClosed", "msg": "The market has already passed its resolution deadline." },
+    { "code": 6001, "name": "MarketResolved", "msg": "The market has already been resolved." },
+    { "code": 6002, "name": "MarketNotReady", "msg": "The market is not yet ready to be resolved." },
+    { "code": 6003, "name": "MarketNotResolved", "msg": "The market is not resolved yet." },
+    { "code": 6004, "name": "ZeroStake", "msg": "You must stake greater than 0 SOL." },
+    { "code": 6005, "name": "NotAWinner", "msg": "Your prediction was incorrect." },
+    { "code": 6006, "name": "AlreadyClaimed", "msg": "You have already claimed your winnings." }
+  ]
+}
