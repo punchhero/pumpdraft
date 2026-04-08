@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import HotTokensTicker from "@/components/HotTokensTicker";
 
 export interface TokenInfo {
   address: string;
@@ -201,6 +202,9 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
           <button className="chart-refresh-btn" onClick={fetchDefaultTokens} title="Refresh">↻</button>
         </div>
       </div>
+
+      {/* ── Hot Tokens Ticker ── */}
+      <HotTokensTicker onTokenSelect={handleSelect} />
 
       {/* ── Search + Dropdown ── */}
       <div className="chart-search-section" ref={wrapRef}>

@@ -791,6 +791,126 @@ body {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   HOT TOKENS TICKER
+   ════════════════════════════════════════════════════════════════ */
+
+.hot-ticker-wrap {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(90deg, #0d0d0d 0%, #181818 100%);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.hot-ticker-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  height: 100%;
+  background: rgba(240,160,32,0.06);
+  flex-shrink: 0;
+}
+
+.hot-ticker-rail {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.hot-ticker-track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: ticker-scroll 28s linear infinite;
+  width: max-content;
+}
+
+.hot-ticker-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.hot-ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.hot-ticker-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--amber);
+  transform: translateY(-1px);
+}
+
+.hot-ticker-img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.hot-ticker-placeholder {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-active);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.hot-ticker-symbol {
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.hot-ticker-mcap {
+  font-size: 10px;
+  color: var(--green);
+  font-weight: 500;
+}
+
+.hot-ticker-flame {
+  font-size: 13px;
+  filter: drop-shadow(0 0 4px rgba(255,140,0,0.8));
+  animation: flame-pulse 2s ease-in-out infinite;
+}
+
+@keyframes flame-pulse {
+  0%, 100% { transform: scale(1);   filter: drop-shadow(0 0 4px rgba(255,140,0,0.8)); }
+  50%       { transform: scale(1.2); filter: drop-shadow(0 0 8px rgba(255,80,0,1));   }
+}
+
+/* ════════════════════════════════════════════════════════════════
    CHART CARD
    ════════════════════════════════════════════════════════════════ */
 
