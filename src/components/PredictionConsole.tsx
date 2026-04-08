@@ -90,6 +90,20 @@ export default function PredictionConsole({
             return;
         }
 
+        // Block betting on tokens that don't meet eligibility requirements
+        const mcapOk = (selectedToken.usd_market_cap ?? 0) >= 200_000;
+        const ageOk  = (selectedToken.age_hours ?? 0) >= 24;
+        if (!mcapOk || !ageOk) {
+            const reasons = [];
+            if (!mcapOk) reasons.push(`MCap $${(selectedToken.usd_market_cap/1000).toFixed(0)}K < $200K minimum`);
+            if (!ageOk)  reasons.push(`Token only ${selectedToken.age_hours}h old (need 24h+)`);
+            addConsoleLine(
+                `> REJECTED: ${selectedToken.symbol} is ineligible — ${reasons.join(" | ")}`,
+                "text-terminal-red"
+            );
+            return;
+        }
+
         if (!amount || amount <= 0) {
             addConsoleLine(
                 "> ERROR: Invalid bet amount. Try a real number.",

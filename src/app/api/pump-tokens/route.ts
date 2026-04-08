@@ -10,6 +10,9 @@ const PUMP_V3 = "https://frontend-api-v3.pump.fun/coins";
 const DEX_TOKENS = "https://api.dexscreener.com/latest/dex/tokens";
 const DEX_SEARCH  = "https://api.dexscreener.com/latest/dex/search";
 
+// ---- Filters for the DEFAULT token list ----
+const MIN_MCAP = 200_000; // Only show tokens with MCap >= $200K in default list
+
 // ---- Criteria ----
 // The user wants tokens that are pump.fun based:
 // - Any Market Cap (show everything, let the user decide)
@@ -40,7 +43,8 @@ export async function GET() {
         const filtered = coins
           .filter((c: any) => {
             const created = (c.created_timestamp ?? 0) * 1000;
-            return created > 0 && now - created >= MIN_AGE_MS;
+            const mcap = c.usd_market_cap ?? 0;
+            return created > 0 && now - created >= MIN_AGE_MS && mcap >= MIN_MCAP;
           })
           .slice(0, 100)
           .map((c: any) => ({
@@ -103,6 +107,8 @@ export async function GET() {
       if (!createdMs || now - createdMs < MIN_AGE_MS) continue;
 
       const mcap = pair.marketCap ?? pair.fdv ?? 0;
+      if (mcap < MIN_MCAP) continue; // Skip tokens below $200K MCap
+
       tokens.push({
         address: addr,
         symbol: pair.baseToken.symbol,

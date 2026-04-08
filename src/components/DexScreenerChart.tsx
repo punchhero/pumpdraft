@@ -9,6 +9,7 @@ export interface TokenInfo {
   image_uri: string | null;
   usd_market_cap: number;
   age_hours: number;
+  valid?: boolean; // true = meets $200K + 24h requirements
 }
 
 interface DexScreenerChartProps {
@@ -28,125 +29,118 @@ function formatAge(h: number): string {
   return `${h}h`;
 }
 
-/** Looks like a Solana public key: 32-48 base58 chars */
 function isSolanaAddress(s: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,48}$/.test(s.trim());
 }
 
+const MIN_MCAP = 200_000;
+const MIN_AGE_H = 24;
+
+function tokenIsValid(t: TokenInfo): boolean {
+  if (t.valid !== undefined) return t.valid;
+  return t.usd_market_cap >= MIN_MCAP && t.age_hours >= MIN_AGE_H;
+}
+
 export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProps) {
-  const [tokens, setTokens]           = useState<TokenInfo[]>([]);
+  const [defaults, setDefaults]       = useState<TokenInfo[]>([]);
   const [loading, setLoading]         = useState(true);
   const [lookupLoading, setLookup]    = useState(false);
-  const [error, setError]             = useState<string | null>(null);
-  const [lookupError, setLookupError] = useState<string | null>(null);
   const [selected, setSelected]       = useState<TokenInfo | null>(null);
   const [search, setSearch]           = useState("");
   const [searchResults, setResults]   = useState<TokenInfo[]>([]);
-  const [copied, setCopied]           = useState<string | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [open, setOpen]               = useState(false);
+  const [copied, setCopied]           = useState(false);
+  const wrapRef    = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ── Initial load of default tokens ──
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Load default token list
   const fetchDefaultTokens = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch("/api/pump-tokens");
       const data = await res.json();
-      const list: TokenInfo[] = data.tokens ?? [];
-      setTokens(list);
+      const list: TokenInfo[] = (data.tokens ?? []).map((t: any) => ({
+        ...t,
+        valid: t.usd_market_cap >= MIN_MCAP && t.age_hours >= MIN_AGE_H,
+      }));
+      setDefaults(list);
       if (list.length > 0 && !selected) {
         setSelected(list[0]);
         onTokenChange?.(list[0]);
       }
-    } catch {
-      setError("Failed to load default tokens.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchDefaultTokens();
-    const interval = setInterval(fetchDefaultTokens, 120_000);
-    return () => clearInterval(interval);
+    const iv = setInterval(fetchDefaultTokens, 120_000);
+    return () => clearInterval(iv);
   }, [fetchDefaultTokens]);
 
-  // ── Live search / address lookup as user types ──
+  // Live search / address lookup as user types
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setLookupError(null);
 
     const q = search.trim();
-    if (!q) {
-      setResults([]);
-      return;
-    }
+    if (!q) { setResults([]); return; }
 
     debounceRef.current = setTimeout(async () => {
       setLookup(true);
       try {
-        let url = "";
-        if (isSolanaAddress(q)) {
-          // Exact contract address lookup
-          url = `/api/token-lookup?address=${encodeURIComponent(q)}`;
-        } else if (q.length >= 2) {
-          // Name / symbol search
-          url = `/api/token-lookup?q=${encodeURIComponent(q)}`;
-        } else {
-          setLookup(false);
-          return;
-        }
+        let url = isSolanaAddress(q)
+          ? `/api/token-lookup?address=${encodeURIComponent(q)}`
+          : `/api/token-lookup?q=${encodeURIComponent(q)}`;
 
-        const res = await fetch(url);
+        const res  = await fetch(url);
         const data = await res.json();
 
-        if (data.error) {
-          setLookupError(data.error);
-          setResults([]);
+        if (data.error) { setLookupError(data.error); setResults([]); return; }
+
+        if (data.token) {
+          const t: TokenInfo = {
+            address: data.token.address,
+            symbol:  data.token.symbol,
+            name:    data.token.name,
+            image_uri: data.token.image_uri,
+            usd_market_cap: data.token.usd_market_cap,
+            age_hours: data.token.age_hours,
+            valid: data.valid,
+          };
+          if (!data.valid && data.warnings?.length) {
+            setLookupError("⚠️ " + data.warnings.join(" | "));
+          }
+          setResults([t]);
+          // Auto-select (even if invalid — blocking happens in PredictionConsole)
+          handleSelect(t);
           return;
         }
 
-        // Single token from address lookup
-        if (data.token) {
-          const t = data.token;
-          const token: TokenInfo = {
-            address: t.address,
-            symbol:  t.symbol,
-            name:    t.name,
+        if (data.tokens) {
+          setResults(data.tokens.map((t: any): TokenInfo => ({
+            address: t.address, symbol: t.symbol, name: t.name,
             image_uri: t.image_uri,
             usd_market_cap: t.usd_market_cap,
             age_hours: t.age_hours,
-          };
-
-          if (!data.valid && data.warnings?.length > 0) {
-            setLookupError("⚠️ " + data.warnings.join(" | "));
-          }
-
-          // Immediately select the token regardless of warnings
-          setResults([token]);
-          handleSelect(token);
-          return;
+            valid: t.usd_market_cap >= MIN_MCAP && t.age_hours >= MIN_AGE_H,
+          })));
         }
-
-        // Multiple results from name search
-        if (data.tokens) {
-          setResults(
-            data.tokens.map((t: any): TokenInfo => ({
-              address: t.address,
-              symbol:  t.symbol,
-              name:    t.name,
-              image_uri: t.image_uri,
-              usd_market_cap: t.usd_market_cap,
-              age_hours: t.age_hours,
-            }))
-          );
-        }
-      } catch {
-        setLookupError("Lookup failed. Check your connection.");
-      } finally {
-        setLookup(false);
-      }
-    }, 500); // 500ms debounce
+      } catch { setLookupError("Lookup failed."); }
+      finally   { setLookup(false); }
+    }, 500);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
@@ -156,18 +150,19 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
     setSearch("");
     setResults([]);
     setLookupError(null);
+    setOpen(false);
   };
 
-  const handleCopy = (e: React.MouseEvent, address: string) => {
+  const handleCopy = (e: React.MouseEvent) => {
+    if (!selected) return;
     e.stopPropagation();
-    navigator.clipboard.writeText(address);
-    setCopied(address);
-    setTimeout(() => setCopied(null), 2000);
+    navigator.clipboard.writeText(selected.address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // Determine which list to show in the sidebar: search results override defaults
-  const showResults  = search.trim().length >= 2;
-  const displayList  = showResults ? searchResults : tokens;
+  const displayList = search.trim().length >= 2 ? searchResults : defaults;
+  const isValid     = selected ? tokenIsValid(selected) : true;
 
   const embedUrl = selected
     ? `https://dexscreener.com/solana/${selected.address}?embed=1&theme=dark&info=0&trades=0`
@@ -175,125 +170,102 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
 
   return (
     <div className="chart-card">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="chart-header">
         <div className="chart-header-left">
           <span className="chart-title">
             {selected ? `$${selected.symbol}` : "Select a Token"}
           </span>
-          {selected && (
-            <span className="chart-subtitle">{selected.name}</span>
-          )}
+          {selected && <span className="chart-subtitle">{selected.name}</span>}
         </div>
         <div className="chart-header-right">
           {selected && (
             <>
-              <div className="chart-meta-pill chart-meta-mcap">
+              <div className={`chart-meta-pill ${isValid ? "chart-meta-mcap" : "chart-meta-warn"}`}>
                 {formatMcap(selected.usd_market_cap)} MCap
+                {!isValid && " ⚠️"}
               </div>
               <div className="chart-meta-pill chart-meta-age">
                 {formatAge(selected.age_hours)} old
               </div>
               <button
-                onClick={(e) => handleCopy(e, selected.address)}
+                onClick={handleCopy}
                 className="chart-meta-pill chart-meta-age"
-                title="Copy Contract Address"
                 style={{ cursor: "pointer" }}
+                title={selected.address}
               >
-                {copied === selected.address ? "✓ Copied!" : "📋 CA"}
+                {copied ? "✓ Copied!" : "📋 CA"}
               </button>
             </>
           )}
-          <button className="chart-refresh-btn" onClick={fetchDefaultTokens} title="Refresh">
-            ↻
-          </button>
+          <button className="chart-refresh-btn" onClick={fetchDefaultTokens} title="Refresh">↻</button>
         </div>
       </div>
 
-      {/* Token browser */}
-      <div className="chart-browser">
-        {/* Search box */}
-        <div className="chart-search-wrap">
+      {/* ── Search + Dropdown ── */}
+      <div className="chart-search-section" ref={wrapRef}>
+        <div style={{ position: "relative" }}>
           <input
             className="chart-search"
-            placeholder="🔍 Paste contract address or search by name…"
+            style={{ width: "100%", borderRadius: open ? "8px 8px 0 0" : "8px" }}
+            placeholder="🔍  Paste contract address or search by name / symbol…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
           />
           {lookupLoading && (
-            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#0ff" }}>
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "var(--green)" }}>
               Searching…
             </span>
           )}
-        </div>
 
-        {/* Lookup error / warning */}
-        {lookupError && (
-          <div className="chart-token-error" style={{ fontSize: 11, padding: "4px 8px" }}>
-            {lookupError}
-          </div>
-        )}
-
-        {/* Helper hint */}
-        {!search && (
-          <div style={{ fontSize: 10, color: "#555", padding: "3px 10px" }}>
-            Paste any Solana contract address or search by name/symbol
-          </div>
-        )}
-
-        {/* Token list */}
-        <div className="chart-token-list">
-          {loading && !showResults && (
-            <div className="chart-token-loading">
-              <span className="chart-token-loading-dot" />
-              Loading Pump.fun tokens…
+          {/* Dropdown */}
+          {open && (
+            <div className="chart-dropdown">
+              {loading && search.trim().length === 0 && (
+                <div className="chart-dropdown-loading">Loading tokens…</div>
+              )}
+              {lookupError && (
+                <div className="chart-dropdown-warn">{lookupError}</div>
+              )}
+              {!loading && displayList.length === 0 && search.trim().length >= 2 && !lookupLoading && (
+                <div className="chart-dropdown-empty">No tokens found for &ldquo;{search}&rdquo;</div>
+              )}
+              {displayList.map((token) => {
+                const valid = tokenIsValid(token);
+                return (
+                  <button
+                    key={token.address}
+                    onClick={() => handleSelect(token)}
+                    className={`chart-dropdown-item ${selected?.address === token.address ? "chart-dropdown-item-active" : ""}`}
+                  >
+                    <span className="chart-token-img">
+                      {token.image_uri
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={token.image_uri} alt={token.symbol} className="chart-token-img-inner" />
+                        : <span className="chart-token-img-placeholder">{token.symbol.slice(0, 2)}</span>
+                      }
+                    </span>
+                    <span className="chart-token-info" style={{ flex: 1 }}>
+                      <span className="chart-token-symbol">${token.symbol}</span>
+                      <span className="chart-token-name">{token.name}</span>
+                    </span>
+                    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                      <span className="chart-token-mcap">{formatMcap(token.usd_market_cap)}</span>
+                      <span className="chart-token-age">{formatAge(token.age_hours)}</span>
+                    </span>
+                    {!valid && (
+                      <span title="Below $200K MCap or <24h old — betting disabled" style={{ marginLeft: 6, fontSize: 14 }}>🔒</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
-          {error && !loading && (
-            <div className="chart-token-error">{error}</div>
-          )}
-
-          {!loading && displayList.length === 0 && search.trim().length >= 2 && !lookupLoading && (
-            <div className="chart-token-empty">No tokens found for &ldquo;{search}&rdquo;</div>
-          )}
-
-          {displayList.map((token) => (
-            <button
-              key={token.address}
-              onClick={() => handleSelect(token)}
-              className={`chart-token-btn ${selected?.address === token.address ? "chart-token-btn-active" : ""}`}
-            >
-              <span className="chart-token-img">
-                {token.image_uri ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={token.image_uri} alt={token.symbol} className="chart-token-img-inner" />
-                ) : (
-                  <span className="chart-token-img-placeholder">
-                    {token.symbol.slice(0, 2)}
-                  </span>
-                )}
-              </span>
-              <span className="chart-token-info">
-                <span className="chart-token-symbol">${token.symbol}</span>
-                <span className="chart-token-name">{token.name}</span>
-              </span>
-              <span className="chart-token-stats">
-                <span className="chart-token-mcap">{formatMcap(token.usd_market_cap)}</span>
-                <span className="chart-token-age">{formatAge(token.age_hours)}</span>
-                <button
-                  onClick={(e) => handleCopy(e, token.address)}
-                  className="chart-token-copy"
-                  title="Copy Contract Address"
-                >
-                  {copied === token.address ? "✓" : "📋"}
-                </button>
-              </span>
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* Chart iframe */}
+      {/* ── Chart iframe ── */}
       <div className="chart-iframe-wrap" style={{ background: "#050505" }}>
         {embedUrl ? (
           <iframe
@@ -302,16 +274,11 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
             title={`${selected?.symbol} Chart`}
             className="chart-iframe"
             allow="clipboard-write"
-            style={{
-              filter: "hue-rotate(-10deg) saturate(1.3) contrast(1.08)",
-              opacity: 0.88,
-              border: "none",
-              background: "transparent"
-            }}
+            style={{ filter: "hue-rotate(-10deg) saturate(1.3) contrast(1.08)", opacity: 0.88, border: "none", background: "transparent" }}
           />
         ) : (
           <div className="chart-iframe-placeholder">
-            <span>Paste a contract address above to start</span>
+            <span>Paste a contract address or search above to start</span>
           </div>
         )}
       </div>
@@ -319,5 +286,4 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
   );
 }
 
-// For backward compat
 export const TOKENS: TokenInfo[] = [];
