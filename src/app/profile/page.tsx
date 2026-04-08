@@ -60,8 +60,11 @@ export default function ProfilePage() {
                     {/* Left: Identity Card */}
                     <div className="card" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", paddingBottom: 24, borderBottom: "1px solid var(--border)" }}>
-                            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--bg-active)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, marginBottom: 16 }}>
-                                👤
+                            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--green-dim)", border: "1.5px solid var(--green-border)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="12" cy="8" r="4" stroke="var(--green)" strokeWidth="1.8" />
+                                  <path d="M4 20c0-4 3.582-7 8-7s8 3 8 7" stroke="var(--green)" strokeWidth="1.8" strokeLinecap="round"/>
+                                </svg>
                             </div>
                             <div style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 600, letterSpacing: "0.04em", marginBottom: 4, textTransform: "uppercase" }}>
                                 Wallet Address
@@ -107,7 +110,12 @@ export default function ProfilePage() {
 
                         {betHistory.length === 0 ? (
                             <div style={{ padding: "64px 24px", textAlign: "center" }}>
-                                <div style={{ fontSize: 32, marginBottom: 12 }}>📈</div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 14, background: "var(--green-dim)", border: "1px solid var(--green-border)", marginBottom: 16 }}>
+                                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <polyline points="3 17 8 12 12 15 17 9 21 12" stroke="var(--green)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <line x1="3" y1="20" x2="21" y2="20" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round"/>
+                                  </svg>
+                                </div>
                                 <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-1)", marginBottom: 8 }}>No predictions yet</h3>
                                 <p style={{ color: "var(--text-3)", marginBottom: 24, fontSize: 14 }}>
                                     Your prediction history will appear here once you place a bet.
