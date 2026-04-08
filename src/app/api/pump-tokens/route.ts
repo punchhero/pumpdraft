@@ -21,11 +21,15 @@ export async function GET() {
 
     const supabase = createClient(url, key);
 
-    // 2. Extremely fast query against our local Supabase index for >= 250k MCAP
+    // Calculate exact ISO string for 24 hours ago
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // 2. Query against our local Supabase index for <= 200k MCAP AND Age > 24h
     const { data: tokens, error } = await supabase
       .from('tokens')
       .select('*')
-      .gte('current_mcap', 250000)
+      .lte('current_mcap', 200000)
+      .lt('launch_timestamp', twentyFourHoursAgo)
       .order('current_mcap', { ascending: false })
       .limit(100);
 
