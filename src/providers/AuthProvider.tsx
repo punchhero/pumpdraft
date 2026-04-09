@@ -97,6 +97,14 @@ export default function AuthProvider({
         return () => subscription.unsubscribe();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── Auto sign-in when wallet connects ──
+    // Triggers signMessage request immediately after wallet connects
+    useEffect(() => {
+        if (connected && publicKey && !user && !loading && !signingIn) {
+            signIn();
+        }
+    }, [connected, publicKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
     /**
      * Sign in with Solana wallet
      */

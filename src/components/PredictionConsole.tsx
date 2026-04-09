@@ -7,7 +7,8 @@ import type { TokenInfo } from "@/components/DexScreenerChart";
 import { usePoints } from "@/providers/PointsProvider";
 import { useSupabasePool } from "@/hooks/useSupabasePool";
 import { createSupabaseClient } from "@/lib/supabase";
-import { Program, AnchorProvider, BN, utils } from "@coral-xyz/anchor";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
+import BN from "bn.js";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import idl from "@/lib/pumpdraft.json";
 
@@ -144,7 +145,8 @@ export default function PredictionConsole({
 
             // 2. Generate a unique integer ID based on Token + Timeframe
             const marketIdStr = `${selectedToken.address.slice(0, 4)}${timeframe}`;
-            const numericHash = Array.from(utils.bytes.utf8.encode(marketIdStr)).reduce((a,b)=>a+b, 0);
+            const encoded = new TextEncoder().encode(marketIdStr);
+            const numericHash = Array.from(encoded).reduce((a: number, b: number) => a + b, 0);
             const marketIdBn = new BN(numericHash);
 
             // 3. Find Smart Contract PDAs
@@ -159,7 +161,7 @@ export default function PredictionConsole({
 
             const tx = new Transaction();
             const marketInfo = await connection.getAccountInfo(marketPda);
-            const amountLamports = new BN(amount * 1e9); // Convert SOL to Lamports
+            const amountLamports = new BN(Math.floor(amount * 1e9)); // lamports must be integer
 
             // 4. If the market doesn't exist yet on-chain, automatically initialize it
             if (!marketInfo) {
@@ -168,7 +170,7 @@ export default function PredictionConsole({
                 const initIx = await program.methods.initializeMarket(
                     marketIdBn,
                     new PublicKey(selectedToken.address),
-                    new BN(selectedToken.usd_market_cap),
+                    new BN(Math.floor(selectedToken.usd_market_cap)),
                     resolveTime
                 )
                 .accounts({
