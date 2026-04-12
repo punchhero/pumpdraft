@@ -2,17 +2,11 @@
 
 import React, { useState, useCallback } from "react";
 import { useAuth } from "@/providers/AuthProvider";
-import { useWallet, useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import type { TokenInfo } from "@/components/DexScreenerChart";
 import { usePoints } from "@/providers/PointsProvider";
 import { useSupabasePool } from "@/hooks/useSupabasePool";
 import { createSupabaseClient } from "@/lib/supabase";
-import { Program, AnchorProvider } from "@coral-xyz/anchor";
-import BN from "bn.js";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import idl from "@/lib/pumpdraft.json";
-
-const PROGRAM_ID = new PublicKey("BLz3BRDWocq7uU6jTBsMwAenSsPNN8TvewfCaRELWk5r");
 
 /**
  * PredictionConsole — The Betting UI
@@ -49,7 +43,6 @@ export default function PredictionConsole({
 }: PredictionConsoleProps) {
     const { user } = useAuth();
     const { publicKey, connected } = useWallet();
-    const anchorWallet = useAnchorWallet();
     const { connection } = useConnection();
     const { points, winStreak, addPoints, lastPointGain, solBalance, deductBalance, addBetRecord } = usePoints();
 
@@ -132,93 +125,27 @@ export default function PredictionConsole({
         setIsPlacingBet(true);
 
         addConsoleLine(
-            `> TX INITIATED: ${amount} SOL on ${selectedToken.symbol} ${direction} [${timeframe}]`,
+            `> BET QUEUED: ${amount} SOL on ${selectedToken.symbol} ${direction} [${timeframe}]`,
             "text-terminal-amber"
         );
 
         try {
-            if (!anchorWallet) throw new Error("Wallet not linked.");
-            
-            // 1. Setup Anchor Provider
-            const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: "processed" });
-            const program = new Program(idl as any, PROGRAM_ID, provider);
+            const walletAddr = publicKey?.toBase58() ?? "demo";
 
-            // 2. Generate a unique integer ID based on Token + Timeframe
-            const marketIdStr = `${selectedToken.address.slice(0, 4)}${timeframe}`;
-            const encoded = new TextEncoder().encode(marketIdStr);
-            const numericHash = Array.from(encoded).reduce((a: number, b: number) => a + b, 0);
-            const marketIdBn = new BN(numericHash);
-
-            // 3. Find Smart Contract PDAs
-            const [marketPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from("market"), marketIdBn.toArrayLike(Buffer, "le", 8)],
-                PROGRAM_ID
-            );
-            const [predictionPda] = PublicKey.findProgramAddressSync(
-                [Buffer.from("prediction"), marketPda.toBuffer(), anchorWallet.publicKey.toBuffer()],
-                PROGRAM_ID
-            );
-
-            const tx = new Transaction();
-            const marketInfo = await connection.getAccountInfo(marketPda);
-            const amountLamports = new BN(Math.floor(amount * 1e9)); // lamports must be integer
-
-            // 4. If the market doesn't exist yet on-chain, automatically initialize it
-            if (!marketInfo) {
-                addConsoleLine(`> INITIALIZING NEW ON-CHAIN MARKET PDA...`, "text-terminal-amber");
-                const resolveTime = new BN(Math.floor(Date.now() / 1000) + (5 * 60));
-                const initIx = await program.methods.initializeMarket(
-                    marketIdBn,
-                    new PublicKey(selectedToken.address),
-                    new BN(Math.floor(selectedToken.usd_market_cap)),
-                    resolveTime
-                )
-                .accounts({
-                    market: marketPda,
-                    creator: anchorWallet.publicKey,
-                    systemProgram: SystemProgram.programId,
-                })
-                .instruction();
-                tx.add(initIx);
-            }
-
-            // 5. Append the user's prediction bet instruction
-            const predictIx = await program.methods.makePrediction(
-                marketIdBn,
-                direction === "UP",
-                amountLamports
-            )
-            .accounts({
-                market: marketPda,
-                prediction: predictionPda,
-                user: anchorWallet.publicKey,
-                systemProgram: SystemProgram.programId,
-            })
-            .instruction();
-            tx.add(predictIx);
-
-            // 6. Request wallet signature and execute entirely on-chain!
-            addConsoleLine(`> WAITING FOR WALLET SIGNATURE...`, "text-terminal-amber animate-pulse");
-            const signature = await provider.sendAndConfirm(tx);
-            
-            addConsoleLine(`> BLOCKCHAIN SUCCESS: TX ${signature.slice(0, 10)}...`, "text-terminal-green font-bold");
-
-            // Only deduct local UI balance after successful chain confirmation
-            deductBalance(amount);
-
-            // Sync with our UI off-chain Supabase stats
+            // 1. Record the pool entry in Supabase
             const poolId = await addBetToPool(
                 selectedToken.symbol,
                 direction,
                 amount,
                 0,
-                publicKey?.toBase58() ?? "demo",
+                walletAddr,
             );
 
-            if (poolId && publicKey) {
+            // 2. Write prediction record
+            if (publicKey) {
                 const supabase = createSupabaseClient();
-                supabase?.from("predictions").insert({
-                    wallet_address: publicKey.toBase58(),
+                await supabase?.from("predictions").insert({
+                    wallet_address: walletAddr,
                     token_address: selectedToken.address,
                     token_symbol: selectedToken.symbol,
                     direction,
@@ -226,16 +153,24 @@ export default function PredictionConsole({
                     entry_price: 0,
                     timeframe,
                     status: "pending",
-                    pool_id: poolId,
-                }).then(() => { });
+                    pool_id: poolId ?? null,
+                });
             }
 
-            // +10 points for placing a verified on-chain bet
+            // 3. Deduct from local balance and award points
+            deductBalance(amount);
             addPoints(10, "BET_PLACED");
-            addConsoleLine(`> +10 PTS AWARDED! BALANCE EXPORTED.`, "text-terminal-green");
+
+            const betId = `${Date.now().toString(36).toUpperCase()}`;
+            addConsoleLine(`> BET CONFIRMED [ID: ${betId}]`, "text-terminal-green");
+            addConsoleLine(
+                `> ${SASSY_RESPONSES[Math.floor(Math.random() * SASSY_RESPONSES.length)]}`,
+                "text-terminal-green"
+            );
+            addConsoleLine(`> +10 PTS AWARDED. Balance: ${(solBalance - amount).toFixed(2)} SOL`, "text-terminal-green");
 
             addBetRecord({
-                id: signature.slice(0,8),
+                id: betId,
                 token: selectedToken.symbol,
                 direction,
                 amount,
@@ -247,7 +182,7 @@ export default function PredictionConsole({
 
         } catch (error: any) {
             console.error("Bet failed", error);
-            addConsoleLine(`> TX REJECTED: ${error.message || "User declined."}`, "text-terminal-red");
+            addConsoleLine(`> ERROR: ${error.message || "Bet could not be recorded."}`, "text-terminal-red");
         }
 
         setBetAmount("");

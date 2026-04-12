@@ -109,12 +109,12 @@ export default function ProfilePage() {
                         </div>
 
                         {betHistory.length === 0 ? (
-                            <div style={{ padding: "64px 24px", textAlign: "center" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 14, background: "var(--green-dim)", border: "1px solid var(--green-border)", marginBottom: 16 }}>
-                                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <polyline points="3 17 8 12 12 15 17 9 21 12" stroke="var(--green)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <line x1="3" y1="20" x2="21" y2="20" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round"/>
-                                  </svg>
+                            <div style={{ padding: "64px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 14, background: "var(--green-dim)", border: "1px solid var(--green-border)", marginBottom: 16 }}>
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <polyline points="3 17 8 12 12 15 17 9 21 12" stroke="var(--green)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <line x1="3" y1="20" x2="21" y2="20" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round"/>
+                                    </svg>
                                 </div>
                                 <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-1)", marginBottom: 8 }}>No predictions yet</h3>
                                 <p style={{ color: "var(--text-3)", marginBottom: 24, fontSize: 14 }}>
