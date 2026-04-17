@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { useAuth } from "@/providers/AuthProvider";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection, useAnchorWallet } from "@solana/wallet-adapter-react";
 import type { TokenInfo } from "@/components/DexScreenerChart";
 import { usePoints } from "@/providers/PointsProvider";
 import { useSupabasePool } from "@/hooks/useSupabasePool";
