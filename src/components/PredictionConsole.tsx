@@ -275,7 +275,6 @@ export default function PredictionConsole({
             : "—";
 
     return (
-    return (
         <div className="bg-[#181818] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex flex-col h-full font-sans">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#121212]">
