@@ -273,13 +273,13 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
       </div>
 
       {/* ── Chart iframe ── */}
-      <div className="flex-1 bg-[#121212] min-h-[500px]">
+      <div className="flex-1 relative bg-[#121212] min-h-[500px]">
         {embedUrl ? (
           <iframe
             key={selected?.address}
             src={embedUrl}
             title={`${selected?.symbol} Chart`}
-            className="w-full h-full border-none"
+            className="absolute inset-0 w-full h-full border-none"
             allow="clipboard-write"
           />
         ) : (
