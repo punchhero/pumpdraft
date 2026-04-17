@@ -7,7 +7,7 @@ import React, {
     useEffect,
     useCallback,
 } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { createSupabaseClient } from "@/lib/supabase";
 import { useTokenTier } from "@/hooks/useTokenTier";
 
@@ -51,7 +51,7 @@ export interface BetRecord {
 
 export type PointReason = "BET_PLACED" | "WIN" | "STREAK_BONUS";
 
-const STARTING_BALANCE = 50;
+// No starting balance — we read real on-chain balance
 
 interface PointsContextType {
     points: number;
@@ -137,6 +137,7 @@ function saveToStorage(wallet: string, state: StoredState) {
 
 export default function PointsProvider({ children }: { children: React.ReactNode }) {
     const { publicKey } = useWallet();
+    const { connection } = useConnection();
     const walletKey = publicKey?.toBase58() ?? "demo";
     const { tier } = useTokenTier();
 
@@ -144,9 +145,25 @@ export default function PointsProvider({ children }: { children: React.ReactNode
     const [winStreak, setWinStreak] = useState(0);
     const [totalWins, setTotalWins] = useState(0);
     const [totalLosses, setTotalLosses] = useState(0);
-    const [solBalance, setSolBalance] = useState(STARTING_BALANCE);
+    const [solBalance, setSolBalance] = useState(0); // real on-chain balance
     const [betHistory, setBetHistory] = useState<BetRecord[]>([]);
     const [lastPointGain, setLastPointGain] = useState<{ amount: number; reason: PointReason } | null>(null);
+
+    // ── Fetch real on-chain SOL balance ──
+    const fetchOnChainBalance = useCallback(async () => {
+        if (!publicKey || !connection) return;
+        try {
+            const lamports = await connection.getBalance(publicKey);
+            setSolBalance(lamports / 1e9); // lamports → SOL
+        } catch { /* silent */ }
+    }, [publicKey, connection]);
+
+    useEffect(() => {
+        fetchOnChainBalance();
+        // Refresh every 30 seconds
+        const iv = setInterval(fetchOnChainBalance, 30_000);
+        return () => clearInterval(iv);
+    }, [fetchOnChainBalance]);
 
     // Load from localStorage when wallet connects
     useEffect(() => {
@@ -158,12 +175,12 @@ export default function PointsProvider({ children }: { children: React.ReactNode
         setSolBalance(stored.solBalance);
         setBetHistory(stored.betHistory ?? []);
 
-        // Also try to fetch from Supabase (Supabase is source of truth)
+        // Also try to fetch Supabase stats (points/wins/losses only — balance is on-chain)
         const supabase = createSupabaseClient();
         if (supabase && walletKey !== "demo") {
             supabase
                 .from("users")
-                .select("points, win_streak, total_wins, total_losses, sol_balance")
+                .select("points, win_streak, total_wins, total_losses")
                 .eq("wallet_address", walletKey)
                 .maybeSingle()
                 .then(({ data }) => {
@@ -172,16 +189,14 @@ export default function PointsProvider({ children }: { children: React.ReactNode
                         setWinStreak(data.win_streak ?? 0);
                         setTotalWins(data.total_wins ?? 0);
                         setTotalLosses(data.total_losses ?? 0);
-                        setSolBalance(data.sol_balance ?? STARTING_BALANCE);
                     } else {
-                        // New user — create row with starting balance
+                        // New user — create row
                         supabase.from("users").insert({
                             wallet_address: walletKey,
                             points: 0,
                             win_streak: 0,
                             total_wins: 0,
                             total_losses: 0,
-                            sol_balance: STARTING_BALANCE,
                         }).then(() => { });
                     }
                 });

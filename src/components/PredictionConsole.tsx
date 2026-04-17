@@ -7,6 +7,12 @@ import type { TokenInfo } from "@/components/DexScreenerChart";
 import { usePoints } from "@/providers/PointsProvider";
 import { useSupabasePool } from "@/hooks/useSupabasePool";
 import { createSupabaseClient } from "@/lib/supabase";
+import { PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
+import BN from "bn.js";
+import idl from "@/lib/pumpdraft.json";
+
+const PROGRAM_ID = new PublicKey("BLz3BRDWocq7uU6jTBsMwAenSsPNN8TvewfCaRELWk5r");
 
 /**
  * PredictionConsole — The Betting UI
@@ -43,6 +49,7 @@ export default function PredictionConsole({
 }: PredictionConsoleProps) {
     const { user } = useAuth();
     const { publicKey, connected } = useWallet();
+    const anchorWallet = useAnchorWallet();
     const { connection } = useConnection();
     const { points, winStreak, addPoints, lastPointGain, solBalance, deductBalance, addBetRecord } = usePoints();
 
@@ -125,14 +132,80 @@ export default function PredictionConsole({
         setIsPlacingBet(true);
 
         addConsoleLine(
-            `> BET QUEUED: ${amount} SOL on ${selectedToken.symbol} ${direction} [${timeframe}]`,
+            `> TX INITIATED: ${amount} SOL on ${selectedToken.symbol} ${direction} [${timeframe}]`,
             "text-terminal-amber"
         );
 
         try {
-            const walletAddr = publicKey?.toBase58() ?? "demo";
+            if (!anchorWallet || !publicKey) throw new Error("Wallet not fully connected.");
+            const walletAddr = publicKey.toBase58();
 
-            // 1. Record the pool entry in Supabase
+            // ── ANCHOR SETUP ──
+            const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: "processed" });
+            const program = new Program(idl as any, PROGRAM_ID, provider);
+
+            // Calculate integer hash for the market ID
+            const marketIdStr = `${selectedToken.address.slice(0, 4)}${timeframe}`;
+            const encoded = new TextEncoder().encode(marketIdStr);
+            const numericHash = Array.from(encoded).reduce((a: number, b: number) => a + b, 0);
+            const marketIdBn = new BN(numericHash);
+
+            const [marketPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("market"), marketIdBn.toArrayLike(Buffer, "le", 8)],
+                PROGRAM_ID
+            );
+            const [predictionPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("prediction"), marketPda.toBuffer(), anchorWallet.publicKey.toBuffer()],
+                PROGRAM_ID
+            );
+
+            const tx = new Transaction();
+            const marketInfo = await connection.getAccountInfo(marketPda);
+            const amountLamports = new BN(Math.floor(amount * LAMPORTS_PER_SOL)); // Safe integer
+
+            // 1. Automatically initialize market PDA if it doesn't exist
+            if (!marketInfo) {
+                addConsoleLine(`> INITIALIZING NEW MARKET ON-CHAIN...`, "text-terminal-amber");
+                const resolveTime = new BN(Math.floor(Date.now() / 1000) + (5 * 60)); // +5 mins fallback
+                const safeMcapInt = Math.floor(selectedToken.usd_market_cap ?? 0);
+                
+                const initIx = await program.methods.initializeMarket(
+                    marketIdBn,
+                    new PublicKey(selectedToken.address),
+                    new BN(safeMcapInt),
+                    resolveTime
+                )
+                .accounts({
+                    market: marketPda,
+                    creator: anchorWallet.publicKey,
+                    systemProgram: SystemProgram.programId,
+                })
+                .instruction();
+                tx.add(initIx);
+            }
+
+            // 2. Append prediction instruction
+            addConsoleLine(`> BUILDING PREDICTION IX...`, "text-terminal-amber");
+            const predictIx = await program.methods.makePrediction(
+                marketIdBn,
+                direction === "UP",
+                amountLamports
+            )
+            .accounts({
+                market: marketPda,
+                prediction: predictionPda,
+                user: anchorWallet.publicKey,
+                systemProgram: SystemProgram.programId,
+            })
+            .instruction();
+            tx.add(predictIx);
+
+            // 3. Send and confirm via Provider (triggers wallet popup)
+            addConsoleLine(`> AWAITING WALLET SIGNATURE...`, "text-terminal-amber");
+            const signature = await provider.sendAndConfirm(tx);
+            addConsoleLine(`> TX CONFIRMED: ${signature.slice(0, 12)}...`, "text-terminal-green");
+
+            // 4. Record bet in Supabase (only after confirmed tx)
             const poolId = await addBetToPool(
                 selectedToken.symbol,
                 direction,
@@ -141,33 +214,29 @@ export default function PredictionConsole({
                 walletAddr,
             );
 
-            // 2. Write prediction record
-            if (publicKey) {
-                const supabase = createSupabaseClient();
-                await supabase?.from("predictions").insert({
-                    wallet_address: walletAddr,
-                    token_address: selectedToken.address,
-                    token_symbol: selectedToken.symbol,
-                    direction,
-                    bet_amount: amount,
-                    entry_price: 0,
-                    timeframe,
-                    status: "pending",
-                    pool_id: poolId ?? null,
-                });
-            }
+            const supabase = createSupabaseClient();
+            await supabase?.from("predictions").insert({
+                wallet_address: walletAddr,
+                token_address: selectedToken.address,
+                token_symbol: selectedToken.symbol,
+                direction,
+                bet_amount: amount,
+                entry_price: 0,
+                timeframe,
+                status: "pending",
+                tx_signature: signature,
+                pool_id: poolId ?? null,
+            });
 
-            // 3. Deduct from local balance and award points
-            deductBalance(amount);
+            // 5. Award points and refresh balance
             addPoints(10, "BET_PLACED");
-
-            const betId = `${Date.now().toString(36).toUpperCase()}`;
+            const betId = signature.slice(0, 8).toUpperCase();
             addConsoleLine(`> BET CONFIRMED [ID: ${betId}]`, "text-terminal-green");
             addConsoleLine(
                 `> ${SASSY_RESPONSES[Math.floor(Math.random() * SASSY_RESPONSES.length)]}`,
                 "text-terminal-green"
             );
-            addConsoleLine(`> +10 PTS AWARDED. Balance: ${(solBalance - amount).toFixed(2)} SOL`, "text-terminal-green");
+            addConsoleLine(`> +10 PTS AWARDED.`, "text-terminal-green");
 
             addBetRecord({
                 id: betId,
@@ -182,7 +251,12 @@ export default function PredictionConsole({
 
         } catch (error: any) {
             console.error("Bet failed", error);
-            addConsoleLine(`> ERROR: ${error.message || "Bet could not be recorded."}`, "text-terminal-red");
+            const msg = error?.message ?? "Unknown error";
+            if (msg.includes("User rejected") || msg.includes("rejected")) {
+                addConsoleLine(`> TX CANCELLED: You rejected the wallet signature.`, "text-terminal-red");
+            } else {
+                addConsoleLine(`> TX FAILED: ${msg}`, "text-terminal-red");
+            }
         }
 
         setBetAmount("");
@@ -201,100 +275,77 @@ export default function PredictionConsole({
             : "—";
 
     return (
-        <div className="terminal-border bg-[#050505] rounded-sm overflow-hidden">
-            {/* Title bar */}
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-terminal-green-dark bg-[#0a0a0a]">
+    return (
+        <div className="bg-[#181818] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex flex-col h-full font-sans">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#121212]">
                 <div className="flex items-center gap-2">
-                    <span className="text-terminal-green text-[10px]">●</span>
-                    <span className="text-terminal-green-dark text-[10px]">
-                        PREDICTION_ENGINE.sh
-                    </span>
+                    <span className="font-bold text-white text-sm tracking-wide">Prediction Pool</span>
                 </div>
-                <div className="flex items-center gap-3 text-[10px]">
-                    {/* Points flash */}
+                <div className="flex items-center gap-4 text-xs font-medium">
                     {lastPointGain && (
-                        <span className="text-yellow-400 font-bold animate-pulse">
+                        <span className="text-yellow-400 animate-pulse">
                             +{lastPointGain.amount} PTS
-                            {lastPointGain.reason === "STREAK_BONUS" && " 🔥 STREAK!"}
+                            {lastPointGain.reason === "STREAK_BONUS" && " 🔥"}
                         </span>
                     )}
-                    <span className="text-terminal-green-dark">
-                        PTS: <span className="text-terminal-green font-bold">{points.toLocaleString()}</span>
+                    <span className="text-[#B3B3B3]">
+                        PTS <span className="text-white ml-1">{points.toLocaleString()}</span>
                     </span>
                     {winStreak >= 2 && (
                         <span className="text-yellow-400 font-bold">
                             🔥{winStreak}W
                         </span>
                     )}
-                    <span className="text-terminal-green">
-                        {selectedToken ? `$${selectedToken.symbol}` : "NO TOKEN"}
-                    </span>
                 </div>
             </div>
 
-            <div className="p-4 space-y-4">
-                {/* Pool Stats Display */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
-                    <div className="terminal-border p-2 text-center">
-                        <div className="text-terminal-green-dark">POOL</div>
-                        <div className="text-terminal-green text-glow font-bold">
-                            {totalPool.toFixed(2)} SOL
-                        </div>
+            <div className="p-5 space-y-6 flex-1 flex flex-col">
+                {/* Stats row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-[#242424] rounded-lg p-3 flex flex-col justify-center items-center">
+                        <span className="text-[#B3B3B3] text-[10px] uppercase tracking-wider mb-1 font-semibold">Pool</span>
+                        <span className="text-white font-bold text-sm">{totalPool.toFixed(2)}</span>
                     </div>
-                    <div className="terminal-border p-2 text-center">
-                        <div className="text-terminal-green-dark">UP BETS</div>
-                        <div className="text-terminal-green font-bold">
-                            {poolData.totalUp.toFixed(2)} SOL
-                        </div>
+                    <div className="bg-[#242424] rounded-lg p-3 flex flex-col justify-center items-center">
+                        <span className="text-[#B3B3B3] text-[10px] uppercase tracking-wider mb-1 font-semibold">Up / Down</span>
+                        <span className="font-bold text-sm inline-flex gap-1 items-center">
+                            <span className="text-[#1DB954]">{poolData.totalUp.toFixed(1)}</span>
+                            <span className="text-[#6B6B6B]">/</span>
+                            <span className="text-[#FF3B5C]">{poolData.totalDown.toFixed(1)}</span>
+                        </span>
                     </div>
-                    <div className="terminal-border p-2 text-center">
-                        <div className="text-terminal-green-dark">DOWN BETS</div>
-                        <div className="text-terminal-red font-bold">
-                            {poolData.totalDown.toFixed(2)} SOL
-                        </div>
+                    <div className="bg-[#242424] rounded-lg p-3 flex flex-col justify-center items-center">
+                        <span className="text-[#B3B3B3] text-[10px] uppercase tracking-wider mb-1 font-semibold">Payout (U/D)</span>
+                        <span className="font-bold text-sm inline-flex gap-1 items-center">
+                            <span className="text-white">{upMultiplier}x</span>
+                            <span className="text-[#6B6B6B]">/</span>
+                            <span className="text-[#B3B3B3]">{downMultiplier}x</span>
+                        </span>
                     </div>
-                    <div className="terminal-border p-2 text-center">
-                        <div className="text-terminal-green-dark">PLAYERS</div>
-                        <div className="text-terminal-amber font-bold">
-                            {poolData.participants}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Pari-Mutuel Multipliers */}
-                <div className="flex gap-2 text-[10px]">
-                    <div className="flex-1 terminal-border p-2 text-center">
-                        <span className="text-terminal-green-dark">UP PAYOUT: </span>
-                        <span className="text-terminal-green font-bold">{upMultiplier}x</span>
-                    </div>
-                    <div className="flex-1 terminal-border p-2 text-center">
-                        <span className="text-terminal-green-dark">DOWN PAYOUT: </span>
-                        <span className="text-terminal-red font-bold">{downMultiplier}x</span>
-                    </div>
-                    <div className="flex-1 terminal-border p-2 text-center">
-                        <span className="text-terminal-green-dark">FEE: </span>
-                        <span className="text-terminal-amber font-bold">5%</span>
+                    <div className="bg-[#242424] rounded-lg p-3 flex flex-col justify-center items-center">
+                        <span className="text-[#B3B3B3] text-[10px] uppercase tracking-wider mb-1 font-semibold">Players</span>
+                        <span className="text-white font-bold text-sm">{poolData.participants}</span>
                     </div>
                 </div>
 
-                {/* Timeframe Selector */}
+                {/* Timeframes */}
                 <div>
-                    <div className="text-terminal-green-dark text-[10px] mb-1.5 tracking-wider">
-                        &gt; SELECT TIMEFRAME:
+                    <div className="text-[#B3B3B3] text-xs font-semibold mb-3">
+                        Timeframe
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-2">
                         {TIMEFRAMES.map((tf) => (
                             <button
                                 key={tf}
                                 onClick={() => setTimeframe(tf)}
                                 className={`
-                  flex-1 py-2 text-xs font-bold tracking-wider
-                  border transition-all duration-150
-                  ${tf === timeframe
-                                        ? "border-terminal-green bg-terminal-green text-black shadow-[0_0_10px_rgba(0,255,65,0.3)]"
-                                        : "border-terminal-green-dark text-terminal-green-dark hover:border-terminal-green hover:text-terminal-green"
+                                    flex-1 py-2.5 rounded-full text-xs font-bold transition-all duration-200
+                                    ${tf === timeframe
+                                        ? "bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20 scale-105"
+                                        : "bg-[#282828] text-white hover:bg-[#3E3E3E]"
                                     }
-                `}
+                                `}
                             >
                                 {tf}
                             </button>
@@ -302,13 +353,12 @@ export default function PredictionConsole({
                     </div>
                 </div>
 
-                {/* Bet Amount Input */}
+                {/* Input */}
                 <div>
-                    <div className="text-terminal-green-dark text-[10px] mb-1.5 tracking-wider">
-                        &gt; ENTER BET AMOUNT (SOL):
+                    <div className="text-[#B3B3B3] text-xs font-semibold mb-3">
+                        Risk Amount (SOL)
                     </div>
-                    <div className="flex items-center gap-2 terminal-border bg-[#0a0a0a] px-3 py-2">
-                        <span className="text-terminal-green text-sm">$</span>
+                    <div className="flex items-center gap-3 bg-[#282828] rounded-full px-5 py-3 transition-colors focus-within:bg-[#3E3E3E]">
                         <input
                             type="number"
                             step="0.01"
@@ -316,90 +366,78 @@ export default function PredictionConsole({
                             value={betAmount}
                             onChange={(e) => setBetAmount(e.target.value)}
                             placeholder="0.00"
-                            className="
-                flex-1 bg-transparent text-terminal-green text-glow text-sm
-                outline-none placeholder:text-terminal-green-dark
-                [appearance:textfield]
-                [&::-webkit-outer-spin-button]:appearance-none
-                [&::-webkit-inner-spin-button]:appearance-none
-              "
+                            className="flex-1 bg-transparent text-white text-base font-bold outline-none placeholder:text-white/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
-                        <span className="text-terminal-green-dark text-xs">SOL</span>
+                        <button onClick={() => setBetAmount((solBalance || 1).toString())} className="text-[#B3B3B3] hover:text-white text-xs font-bold px-3 py-1.5 bg-[#404040] hover:bg-[#555] rounded-full transition-colors">
+                            MAX
+                        </button>
                     </div>
                 </div>
 
-                {/* PUMP / DUMP Buttons */}
-                <div className="grid grid-cols-2 gap-3">
-                    {/* PUMP (UP) */}
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-4 mt-2">
                     <button
                         onClick={() => placeBet("UP")}
                         disabled={isPlacingBet}
                         className="
-              group relative py-4
-              border-2 border-terminal-green
-              bg-transparent
-              text-terminal-green text-lg font-bold tracking-widest
-              transition-all duration-200
-              hover:bg-terminal-green hover:text-black
-              hover:shadow-[0_0_30px_rgba(0,255,65,0.4)]
-              active:scale-95
-              disabled:opacity-50 disabled:cursor-wait
-            "
+                            group flex flex-col items-center justify-center py-5
+                            bg-[#1DB954] text-black rounded-full
+                            text-sm font-bold tracking-wide
+                            transition-all duration-200
+                            hover:bg-[#1ed760] hover:scale-[1.02] active:scale-95
+                            disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed
+                            shadow-lg shadow-[#1DB954]/10
+                        "
                     >
-                        <span className="text-2xl">▲</span>
-                        <br />
+                        <span className="text-xl leading-none mb-1">▲</span>
                         PUMP
                     </button>
 
-                    {/* DUMP (DOWN) */}
                     <button
                         onClick={() => placeBet("DOWN")}
                         disabled={isPlacingBet}
                         className="
-              group relative py-4
-              border-2 border-terminal-red
-              bg-transparent
-              text-terminal-red text-lg font-bold tracking-widest
-              transition-all duration-200
-              hover:bg-terminal-red hover:text-black
-              hover:shadow-[0_0_30px_rgba(255,0,64,0.4)]
-              active:scale-95
-              disabled:opacity-50 disabled:cursor-wait
-            "
+                            group flex flex-col items-center justify-center py-5
+                            bg-[#282828] text-white rounded-full
+                            text-sm font-bold tracking-wide
+                            transition-all duration-200
+                            hover:bg-[#FF3B5C] hover:text-white hover:scale-[1.02] active:scale-95
+                            disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed
+                        "
                     >
-                        <span className="text-2xl">▼</span>
-                        <br />
+                        <span className="text-xl leading-none mb-1">▼</span>
                         DUMP
                     </button>
                 </div>
 
-                {/* Console Output / Bet History */}
-                {consoleLines.length > 0 && (
-                    <div className="terminal-border bg-[#0a0a0a] p-3 max-h-[160px] overflow-y-auto">
-                        <div className="text-terminal-green-dark text-[10px] mb-1 tracking-wider">
-                            CONSOLE OUTPUT:
-                        </div>
-                        {consoleLines.map((line, i) => (
-                            <div key={i} className={`text-xs ${line.color} leading-relaxed`}>
-                                {line.text}
-                            </div>
-                        ))}
-                        <div className="text-terminal-green text-xs mt-1">
-                            &gt; <span className="cursor-blink">█</span>
-                        </div>
+                {/* Activity Feed */}
+                <div className="mt-4 flex-1 flex flex-col">
+                    <div className="text-[#B3B3B3] text-[10px] uppercase font-bold tracking-wider mb-3">
+                        Activity Feed
                     </div>
-                )}
-            </div>
-
-            {/* Bottom status */}
-            <div className="flex justify-between px-3 py-1 border-t border-terminal-green-dark text-[10px] text-terminal-green-dark">
-                <span>
-                    TIMEFRAME: <span className="text-terminal-green">{timeframe}</span>
-                </span>
-                <span>
-                    ENGINE:{" "}
-                    <span className="text-terminal-green">PARI-MUTUEL</span>
-                </span>
+                    <div className="flex-1 min-h-[140px] max-h-[160px] overflow-y-auto pr-2 rounded-lg bg-[#121212] p-4">
+                        {consoleLines.length === 0 ? (
+                            <div className="text-[#6B6B6B] text-xs font-medium italic">
+                                Waiting for market action...
+                            </div>
+                        ) : (
+                            <div className="space-y-2 flex flex-col border-none">
+                                {consoleLines.map((line, idx) => {
+                                    const cleanText = line.text.replace(/^>\s*/, "");
+                                    const isRed = line.color.includes("red");
+                                    const isAmber = line.color.includes("amber");
+                                    const isGreen = line.color.includes("green");
+                                    return (
+                                        <div key={idx} className={`textxs leading-relaxed ${isRed ? "text-[#FF3B5C]" : isAmber ? "text-[#F0A020]" : isGreen ? "text-[#1DB954]" : "text-[#B3B3B3]"}`}>
+                                            <span className="opacity-40 mr-2 text-[10px]">•</span>
+                                            {cleanText}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );

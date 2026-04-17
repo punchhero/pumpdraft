@@ -170,36 +170,35 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
     : null;
 
   return (
-    <div className="chart-card">
+    <div className="bg-[#181818] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex flex-col h-full font-sans">
       {/* ── Header ── */}
-      <div className="chart-header">
-        <div className="chart-header-left">
-          <span className="chart-title">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#121212]">
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-white text-xl tracking-wide">
             {selected ? `$${selected.symbol}` : "Select a Token"}
           </span>
-          {selected && <span className="chart-subtitle">{selected.name}</span>}
+          {selected && <span className="text-[#B3B3B3] text-sm font-medium">{selected.name}</span>}
         </div>
-        <div className="chart-header-right">
+        <div className="flex items-center gap-2">
           {selected && (
             <>
-              <div className={`chart-meta-pill ${isValid ? "chart-meta-mcap" : "chart-meta-warn"}`}>
+              <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 ${isValid ? "bg-[#242424] text-[#1DB954]" : "bg-[#2A1010] text-[#FF3B5C]"}`}>
                 {formatMcap(selected.usd_market_cap)} MCap
                 {!isValid && " ⚠️"}
               </div>
-              <div className="chart-meta-pill chart-meta-age">
+              <div className="bg-[#242424] text-[#B3B3B3] px-3 py-1.5 rounded-full text-xs font-semibold">
                 {formatAge(selected.age_hours)} old
               </div>
               <button
                 onClick={handleCopy}
-                className="chart-meta-pill chart-meta-age"
-                style={{ cursor: "pointer" }}
+                className="bg-[#242424] hover:bg-[#333] text-[#B3B3B3] hover:text-white px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer"
                 title={selected.address}
               >
                 {copied ? "✓ Copied!" : "📋 CA"}
               </button>
             </>
           )}
-          <button className="chart-refresh-btn" onClick={fetchDefaultTokens} title="Refresh">↻</button>
+          <button className="bg-[#242424] hover:bg-[#333] text-[#B3B3B3] hover:text-white w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors ml-1" onClick={fetchDefaultTokens} title="Refresh">↻</button>
         </div>
       </div>
 
@@ -207,33 +206,33 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
       <HotTokensTicker onTokenSelect={handleSelect} />
 
       {/* ── Search + Dropdown ── */}
-      <div className="chart-search-section" ref={wrapRef}>
+      <div className="p-4 border-b border-white/5 bg-[#121212]" ref={wrapRef}>
         <div style={{ position: "relative" }}>
           <input
-            className="chart-search"
-            style={{ width: "100%", borderRadius: open ? "8px 8px 0 0" : "8px" }}
+            className="w-full bg-[#282828] text-white text-sm font-medium px-5 py-3 outline-none placeholder:text-white/30 transition-colors focus:bg-[#3E3E3E]"
+            style={{ borderRadius: open ? "12px 12px 0 0" : "12px" }}
             placeholder="🔍  Paste contract address or search by name / symbol…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
           />
           {lookupLoading && (
-            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "var(--green)" }}>
+            <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#1DB954", fontWeight: 600 }}>
               Searching…
             </span>
           )}
 
           {/* Dropdown */}
           {open && (
-            <div className="chart-dropdown">
+            <div className="absolute top-full left-0 right-0 max-h-[300px] overflow-y-auto bg-[#242424] border border-[#3E3E3E] rounded-b-xl shadow-2xl z-50">
               {loading && search.trim().length === 0 && (
-                <div className="chart-dropdown-loading">Loading tokens…</div>
+                <div className="p-4 text-center text-[#B3B3B3] text-sm">Loading tokens…</div>
               )}
               {lookupError && (
-                <div className="chart-dropdown-warn">{lookupError}</div>
+                <div className="p-4 text-center text-[#FF3B5C] font-semibold text-sm bg-[#2A1010]">{lookupError}</div>
               )}
               {!loading && displayList.length === 0 && search.trim().length >= 2 && !lookupLoading && (
-                <div className="chart-dropdown-empty">No tokens found for &ldquo;{search}&rdquo;</div>
+                <div className="p-4 text-center text-[#B3B3B3] text-sm italic">No tokens found for &ldquo;{search}&rdquo;</div>
               )}
               {displayList.map((token) => {
                 const valid = tokenIsValid(token);
@@ -241,26 +240,30 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
                   <button
                     key={token.address}
                     onClick={() => handleSelect(token)}
-                    className={`chart-dropdown-item ${selected?.address === token.address ? "chart-dropdown-item-active" : ""}`}
+                    className={`w-full text-left px-4 py-3 flex items-center justify-between border-b border-white/5 hover:bg-[#333] transition-colors ${selected?.address === token.address ? "bg-[#333] border-l-4 border-l-[#1DB954]" : "border-l-4 border-l-transparent"}`}
                   >
-                    <span className="chart-token-img">
-                      {token.image_uri
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={token.image_uri} alt={token.symbol} className="chart-token-img-inner" />
-                        : <span className="chart-token-img-placeholder">{token.symbol.slice(0, 2)}</span>
-                      }
-                    </span>
-                    <span className="chart-token-info" style={{ flex: 1 }}>
-                      <span className="chart-token-symbol">${token.symbol}</span>
-                      <span className="chart-token-name">{token.name}</span>
-                    </span>
-                    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                      <span className="chart-token-mcap">{formatMcap(token.usd_market_cap)}</span>
-                      <span className="chart-token-age">{formatAge(token.age_hours)}</span>
-                    </span>
-                    {!valid && (
-                      <span title="Below $200K MCap or <24h old — betting disabled" style={{ marginLeft: 6, fontSize: 14 }}>🔒</span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-full overflow-hidden bg-[#181818] flex items-center justify-center flex-shrink-0 border border-white/10">
+                        {token.image_uri
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={token.image_uri} alt={token.symbol} className="w-full h-full object-cover" />
+                          : <span className="text-[#B3B3B3] text-xs font-bold uppercase">{token.symbol.slice(0, 2)}</span>
+                        }
+                      </span>
+                      <div className="flex flex-col flex-1">
+                        <span className="font-bold text-white tracking-wide">${token.symbol}</span>
+                        <span className="text-[#B3B3B3] text-[11px] truncate max-w-[150px]">{token.name}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${valid ? "bg-[#1DB954]/10 text-[#1DB954]" : "bg-[#FF3B5C]/10 text-[#FF3B5C]"}`}>
+                          {formatMcap(token.usd_market_cap)}
+                        </span>
+                        {!valid && <span title="Below $200K MCap or <24h old — betting disabled" className="text-[10px]">🔒</span>}
+                      </div>
+                      <span className="text-[#B3B3B3] text-[10px] font-medium">{formatAge(token.age_hours)}</span>
+                    </div>
                   </button>
                 );
               })}
@@ -270,19 +273,20 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
       </div>
 
       {/* ── Chart iframe ── */}
-      <div className="chart-iframe-wrap" style={{ background: "#050505" }}>
+      <div className="flex-1 bg-[#121212] min-h-[500px]">
         {embedUrl ? (
           <iframe
             key={selected?.address}
             src={embedUrl}
             title={`${selected?.symbol} Chart`}
-            className="chart-iframe"
+            className="w-full h-full border-none"
             allow="clipboard-write"
-            style={{ filter: "hue-rotate(-10deg) saturate(1.3) contrast(1.08)", opacity: 0.88, border: "none", background: "transparent" }}
           />
         ) : (
-          <div className="chart-iframe-placeholder">
-            <span>Paste a contract address or search above to start</span>
+          <div className="flex flex-col text-center items-center justify-center h-full text-[#B3B3B3]">
+            <span className="text-4xl mb-4 opacity-50">📈</span>
+            <div className="text-sm font-medium tracking-wide text-white mb-1">Select a token to view chart</div>
+            <div className="text-xs">Paste a contract address or search above to start</div>
           </div>
         )}
       </div>

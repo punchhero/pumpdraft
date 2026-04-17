@@ -1,15 +1,24 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { usePoints } from "@/providers/PointsProvider";
 import AppNav from "@/components/AppNav";
 import { PillLogo } from "@/components/FloatingPills";
+import { createSupabaseClient } from "@/lib/supabase";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
+import BN from "bn.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import idl from "@/lib/pumpdraft.json";
+
+const PROGRAM_ID = new PublicKey("BLz3BRDWocq7uU6jTBsMwAenSsPNN8TvewfCaRELWk5r");
 
 export default function ProfilePage() {
     const { publicKey, connected } = useWallet();
+    const anchorWallet = useAnchorWallet();
+    const { connection } = useConnection();
     const { setVisible } = useWalletModal();
     const {
         points, winStreak, totalWins, totalLosses, winRate,
@@ -18,6 +27,79 @@ export default function ProfilePage() {
 
     const totalBets = totalWins + totalLosses;
 
+    const [dbBets, setDbBets] = useState<any[]>([]);
+    const [isClaiming, setIsClaiming] = useState<string | null>(null);
+
+    // Fetch db bets directly since local history doesn't have token_address needed for market PDA
+    useEffect(() => {
+        if (!publicKey) return;
+        const supabase = createSupabaseClient();
+        if (supabase) {
+            supabase
+                .from("predictions")
+                .select("*")
+                .eq("wallet_address", publicKey.toBase58())
+                .order("created_at", { ascending: false })
+                .limit(50)
+                .then(({ data }) => {
+                    if (data) setDbBets(data);
+                });
+        }
+    }, [publicKey]);
+
+    const handleClaim = async (bet: any) => {
+        if (!anchorWallet || !publicKey || !bet.token_address || !bet.timeframe) return;
+        setIsClaiming(bet.id);
+        try {
+            const provider = new AnchorProvider(connection, anchorWallet, { preflightCommitment: "processed" });
+            const program = new Program(idl as any, PROGRAM_ID, provider);
+
+            const marketIdStr = `${bet.token_address.slice(0, 4)}${bet.timeframe}`;
+            const encoded = new TextEncoder().encode(marketIdStr);
+            const numericHash = Array.from(encoded).reduce((a: number, b: number) => a + b, 0);
+            const marketIdBn = new BN(numericHash);
+
+            const [marketPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("market"), marketIdBn.toArrayLike(Buffer, "le", 8)],
+                PROGRAM_ID
+            );
+            const [predictionPda] = PublicKey.findProgramAddressSync(
+                [Buffer.from("prediction"), marketPda.toBuffer(), anchorWallet.publicKey.toBuffer()],
+                PROGRAM_ID
+            );
+
+            const tx = new Transaction();
+            const claimIx = await program.methods.claimWinnings()
+                .accounts({
+                    market: marketPda,
+                    prediction: predictionPda,
+                    user: anchorWallet.publicKey,
+                    systemProgram: SystemProgram.programId,
+                })
+                .instruction();
+            tx.add(claimIx);
+
+            await provider.sendAndConfirm(tx);
+            
+            // Update supabase after successful claim
+            const supabase = createSupabaseClient();
+            if (supabase) {
+                await supabase.from("predictions").update({ has_claimed: true }).eq("id", bet.id);
+            }
+            
+            // update local UI
+            setDbBets(prev => prev.map(b => b.id === bet.id ? { ...b, has_claimed: true } : b));
+
+        } catch (error) {
+            console.error("Claim failed", error);
+            alert("Claim Failed: The market may not be settled on-chain yet, or you already claimed it.");
+        }
+        setIsClaiming(null);
+    };
+
+    const displayBets = dbBets.length > 0 ? dbBets : betHistory.map(b => ({
+      id: b.id, token_symbol: b.token, direction: b.direction, timeframe: b.timeframe, bet_amount: b.amount, result: b.result, payout: b.payout
+    }));
     if (!connected || !publicKey) {
         return (
             <div className="dash-root">
@@ -108,7 +190,7 @@ export default function ProfilePage() {
                             <span style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500 }}>Last 50 predictions</span>
                         </div>
 
-                        {betHistory.length === 0 ? (
+                        {displayBets.length === 0 ? (
                             <div style={{ padding: "64px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 56, height: 56, borderRadius: 14, background: "var(--green-dim)", border: "1px solid var(--green-border)", marginBottom: 16 }}>
                                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -137,9 +219,9 @@ export default function ProfilePage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {betHistory.map((bet) => (
+                                        {displayBets.map((bet) => (
                                             <tr key={bet.id}>
-                                                <td style={{ fontWeight: 700, color: "var(--text-1)" }}>${bet.token}</td>
+                                                <td style={{ fontWeight: 700, color: "var(--text-1)" }}>${bet.token_symbol}</td>
                                                 <td>
                                                     <span style={{ 
                                                         color: bet.direction === "UP" ? "var(--green)" : "var(--red)", 
@@ -155,16 +237,34 @@ export default function ProfilePage() {
                                                 </td>
                                                 <td style={{ fontWeight: 500 }}>{bet.timeframe}</td>
                                                 <td className="text-right" style={{ color: "var(--text-2)", fontWeight: 500 }}>
-                                                    {bet.amount.toFixed(2)} SOL
+                                                    {Number(bet.bet_amount).toFixed(2)} SOL
                                                 </td>
                                                 <td className="text-right">
                                                     {bet.result === "pending" && (
                                                         <span style={{ color: "var(--amber)", fontWeight: 600 }}>PENDING</span>
                                                     )}
                                                     {bet.result === "win" && (
-                                                        <span style={{ color: "var(--green)", fontWeight: 700 }}>
-                                                            ✓ +{bet.payout.toFixed(2)} SOL
-                                                        </span>
+                                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                                                            <span style={{ color: "var(--green)", fontWeight: 700 }}>
+                                                                ✓ +{Number(bet.payout).toFixed(2)} SOL
+                                                            </span>
+                                                            {!bet.has_claimed && bet.token_address && (
+                                                                <button 
+                                                                    onClick={() => handleClaim(bet)}
+                                                                    disabled={isClaiming === bet.id}
+                                                                    style={{ 
+                                                                        background: "var(--green)", color: "black", border: "none", 
+                                                                        padding: "4px 8px", borderRadius: 4, fontSize: 10, fontWeight: 800, 
+                                                                        cursor: "pointer", textTransform: "uppercase" 
+                                                                    }}
+                                                                >
+                                                                    {isClaiming === bet.id ? "..." : "Claim"}
+                                                                </button>
+                                                            )}
+                                                            {bet.has_claimed && (
+                                                                <span style={{ fontSize: 10, color: "var(--text-3)", fontWeight: 600 }}>CLAIMED</span>
+                                                            )}
+                                                        </div>
                                                     )}
                                                     {bet.result === "loss" && (
                                                         <span style={{ color: "var(--red)", fontWeight: 600 }}>
