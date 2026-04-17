@@ -33,7 +33,7 @@ export default function AppNav() {
       setTimeout(() => setAirdropStatus("idle"), 3000);
     } catch {
       setAirdropStatus("error");
-      setTimeout(() => setAirdropStatus("idle"), 3000);
+      setTimeout(() => setAirdropStatus("idle"), 15000); // 15 seconds to read popup
     }
   }, [publicKey, connection]);
 
@@ -98,17 +98,41 @@ export default function AppNav() {
 
           {/* Airdrop button — only when connected */}
           {connected && solBalance < 1 && (
-            <button
-              id="airdrop-sol-btn"
-              onClick={handleAirdrop}
-              disabled={airdropStatus === "loading"}
-              className={`appnav-airdrop ${airdropStatus}`}
-            >
-              {airdropStatus === "idle"    && "💧 Fund Wallet"}
-              {airdropStatus === "loading" && "Requesting…"}
-              {airdropStatus === "success" && "✓ +1 SOL"}
-              {airdropStatus === "error"   && "Rate limited"}
-            </button>
+            <div className="relative">
+              <button
+                id="airdrop-sol-btn"
+                onClick={handleAirdrop}
+                disabled={airdropStatus === "loading"}
+                className={`appnav-airdrop ${airdropStatus}`}
+              >
+                {airdropStatus === "idle"    && "💧 Fund Wallet"}
+                {airdropStatus === "loading" && "Requesting…"}
+                {airdropStatus === "success" && "✓ +1 SOL"}
+                {airdropStatus === "error"   && "Rate limited"}
+              </button>
+
+              {airdropStatus === "error" && (
+                <div className="absolute top-full mt-3 right-0 w-[280px] bg-[#181818] border border-white/10 rounded-xl p-4 shadow-2xl z-50 animate-in fade-in zoom-in duration-200">
+                  <p className="text-[#FF3B5C] text-sm font-bold mb-1">Auto-Faucet Rate Limited!</p>
+                  <p className="text-[#B3B3B3] text-xs leading-relaxed mb-4">
+                    The Devnet is busy. You can manually fund your wallet by pasting your address at the official Solana Faucet. 
+                    <br/><br/>
+                    <strong>1.</strong> Choose "Devnet"<br/>
+                    <strong>2.</strong> Enter amount of SOL<br/>
+                    <strong>3.</strong> Click Airdrop (no wallet connection required).
+                  </p>
+                  <a 
+                    href="https://faucet.solana.com/" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="block w-full text-center bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold py-2.5 rounded-full transition-colors"
+                    onClick={() => setAirdropStatus("idle")}
+                  >
+                    Go to faucet.solana.com
+                  </a>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Wallet button */}
