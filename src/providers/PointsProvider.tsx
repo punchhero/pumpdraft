@@ -82,7 +82,7 @@ const PointsContext = createContext<PointsContextType>({
     totalWins: 0,
     totalLosses: 0,
     winRate: 0,
-    solBalance: STARTING_BALANCE,
+    solBalance: 0,
     betHistory: [],
     tierMultiplier: 1,
     tierLabel: "DEGEN",
@@ -124,7 +124,7 @@ function loadFromStorage(wallet: string): StoredState {
         winStreak: 0,
         totalWins: 0,
         totalLosses: 0,
-        solBalance: STARTING_BALANCE,
+        solBalance: 0,
         betHistory: [],
     };
 }
