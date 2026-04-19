@@ -170,99 +170,99 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
     : null;
 
   return (
-    <div className="bg-[#181818] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex flex-col h-full font-sans">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#121212]">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-white text-xl tracking-wide">
-            {selected ? `$${selected.symbol}` : "Select a Token"}
-          </span>
-          {selected && <span className="text-[#B3B3B3] text-sm font-medium">{selected.name}</span>}
-        </div>
+    <div className="bg-[#121212] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex flex-col h-full font-sans relative">
+      
+      {/* ── Top Header / Search Navbar ── */}
+      <div className="absolute top-0 left-0 right-0 z-10 pt-4 px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {selected && (
-            <>
-              <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 ${isValid ? "bg-[#242424] text-[#1DB954]" : "bg-[#2A1010] text-[#FF3B5C]"}`}>
-                {formatMcap(selected.usd_market_cap)} MCap
-                {!isValid && " ⚠️"}
-              </div>
-              <div className="bg-[#242424] text-[#B3B3B3] px-3 py-1.5 rounded-full text-xs font-semibold">
-                {formatAge(selected.age_hours)} old
-              </div>
-              <button
-                onClick={handleCopy}
-                className="bg-[#242424] hover:bg-[#333] text-[#B3B3B3] hover:text-white px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer"
-                title={selected.address}
-              >
-                {copied ? "✓ Copied!" : "📋 CA"}
-              </button>
-            </>
-          )}
-          <button className="bg-[#242424] hover:bg-[#333] text-[#B3B3B3] hover:text-white w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors ml-1" onClick={fetchDefaultTokens} title="Refresh">↻</button>
+          <button className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11 2.207L9.793 1L3.146 7.646a.5.5 0 000 .708l6.647 6.646L11 13.793 5.207 8 11 2.207z"></path></svg>
+          </button>
+          <button className="w-8 h-8 rounded-full bg-black/40 xl:flex hidden items-center justify-center text-white/30 cursor-not-allowed">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M5 13.793l1.207 1.207 6.647-6.646a.5.5 0 000-.708L6.207 1 5 2.207 10.793 8 5 13.793z"></path></svg>
+          </button>
         </div>
-      </div>
 
-      {/* ── Hot Tokens Ticker ── */}
-      <HotTokensTicker onTokenSelect={handleSelect} />
+        {/* Spotify Pill Search */}
+        <div className="flex-1 max-w-[400px] ml-4 relative" ref={wrapRef}>
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+               <svg fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" aria-hidden="true"><path d="M10.533 1.27893C5.35215 1.27893 1.12598 5.41887 1.12598 10.5579C1.12598 15.697 5.35215 19.8369 10.533 19.8369C12.767 19.8369 14.8235 19.0671 16.4402 17.7794L20.7929 22.132C21.1834 22.5226 21.8166 22.5226 22.2071 22.132C22.5976 21.7415 22.5976 21.1083 22.2071 20.7178L17.8634 16.3741C19.1833 14.7874 19.94 12.762 19.94 10.5579C19.94 5.41887 15.7138 1.27893 10.533 1.27893ZM3.12598 10.5579C3.12598 6.55226 6.42768 3.27893 10.533 3.27893C14.6383 3.27893 17.94 6.55226 17.94 10.5579C17.94 14.5636 14.6383 17.8369 10.533 17.8369C6.42768 17.8369 3.12598 14.5636 3.12598 10.5579Z"></path></svg>
+            </div>
+            <input
+              className="w-full bg-[#242424] hover:bg-[#2A2A2A] text-white text-sm font-medium pl-10 pr-4 py-3 outline-none placeholder:text-white/50 transition-colors shadow-lg"
+              style={{ borderRadius: open ? "24px 24px 0 0" : "24px" }}
+              placeholder="What do you want to chart?"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+              onFocus={() => setOpen(true)}
+            />
+            {lookupLoading && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin"></div>
+            )}
+          </div>
 
-      {/* ── Search + Dropdown ── */}
-      <div className="p-4 border-b border-white/5 bg-[#121212]" ref={wrapRef}>
-        <div style={{ position: "relative" }}>
-          <input
-            className="w-full bg-[#282828] text-white text-sm font-medium px-5 py-3 outline-none placeholder:text-white/30 transition-colors focus:bg-[#3E3E3E]"
-            style={{ borderRadius: open ? "12px 12px 0 0" : "12px" }}
-            placeholder="🔍  Paste contract address or search by name / symbol…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
-          />
-          {lookupLoading && (
-            <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#1DB954", fontWeight: 600 }}>
-              Searching…
-            </span>
-          )}
-
-          {/* Dropdown */}
+          {/* Search Dropdown / "Track List" */}
           {open && (
-            <div className="absolute top-full left-0 right-0 max-h-[300px] overflow-y-auto bg-[#242424] border border-[#3E3E3E] rounded-b-xl shadow-2xl z-50">
+            <div className="absolute top-full left-0 right-0 max-h-[400px] overflow-y-auto bg-[#181818] border border-white/5 rounded-b-2xl shadow-2xl z-50 py-2">
               {loading && search.trim().length === 0 && (
-                <div className="p-4 text-center text-[#B3B3B3] text-sm">Loading tokens…</div>
+                <div className="p-6 text-center text-[#B3B3B3] text-sm">Loading tracks...</div>
               )}
               {lookupError && (
-                <div className="p-4 text-center text-[#FF3B5C] font-semibold text-sm bg-[#2A1010]">{lookupError}</div>
+                <div className="p-4 text-center text-[#FF3B5C] font-semibold text-sm">{lookupError}</div>
               )}
               {!loading && displayList.length === 0 && search.trim().length >= 2 && !lookupLoading && (
-                <div className="p-4 text-center text-[#B3B3B3] text-sm italic">No tokens found for &ldquo;{search}&rdquo;</div>
+                <div className="p-6 text-center text-[#B3B3B3] text-sm italic">No results found for &ldquo;{search}&rdquo;</div>
               )}
-              {displayList.map((token) => {
+              {displayList.length > 0 && (
+                <div className="px-4 pb-2 text-[11px] font-bold tracking-widest text-[#B3B3B3] uppercase flex items-center border-b border-white/5">
+                  <div className="w-8 text-center">#</div>
+                  <div className="flex-1">Title</div>
+                  <div className="hidden sm:block w-24 text-right">Album</div>
+                  <div className="w-16 text-right flex justify-end"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8z"></path><path d="M8 3.25a.75.75 0 01.75.75v3.25H11a.75.75 0 010 1.5H7.25V4A.75.75 0 018 3.25z"></path></svg></div>
+                </div>
+              )}
+              {displayList.map((token, idx) => {
                 const valid = tokenIsValid(token);
+                const isActive = selected?.address === token.address;
                 return (
                   <button
                     key={token.address}
                     onClick={() => handleSelect(token)}
-                    className={`w-full text-left px-4 py-3 flex items-center justify-between border-b border-white/5 hover:bg-[#333] transition-colors ${selected?.address === token.address ? "bg-[#333] border-l-4 border-l-[#1DB954]" : "border-l-4 border-l-transparent"}`}
+                    className={`w-full text-left px-4 py-2 flex items-center justify-between hover:bg-white/10 transition-colors group ${isActive ? "bg-white/5" : ""}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-full overflow-hidden bg-[#181818] flex items-center justify-center flex-shrink-0 border border-white/10">
+                    <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                      <div className="w-8 flex justify-center flex-shrink-0">
+                        {isActive ? (
+                          <svg className="fill-[#1DB954]" width="14" height="14" viewBox="0 0 24 24"><path d="M5.5 3.5h2v17h-2zm11 0h2v17h-2z" /></svg>
+                        ) : (
+                          <span className="text-[#B3B3B3] text-sm font-medium group-hover:hidden">{idx + 1}</span>
+                        )}
+                        {!isActive && (
+                          <svg className="fill-white hidden group-hover:block" width="14" height="14" viewBox="0 0 24 24"><path d="M6 3.5l14 8.5-14 8.5z" /></svg>
+                        )}
+                      </div>
+                      
+                      <span className="w-10 h-10 rounded shadow-md overflow-hidden bg-[#242424] flex items-center justify-center flex-shrink-0">
                         {token.image_uri
                           // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={token.image_uri} alt={token.symbol} className="w-full h-full object-cover" />
-                          : <span className="text-[#B3B3B3] text-xs font-bold uppercase">{token.symbol.slice(0, 2)}</span>
+                          : <span className="text-[#B3B3B3] text-[10px] font-bold uppercase">{token.symbol.slice(0, 2)}</span>
                         }
                       </span>
-                      <div className="flex flex-col flex-1">
-                        <span className="font-bold text-white tracking-wide">${token.symbol}</span>
-                        <span className="text-[#B3B3B3] text-[11px] truncate max-w-[150px]">{token.name}</span>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className={`font-medium tracking-tight truncate ${isActive ? "text-[#1DB954]" : "text-white"}`}>{token.name}</span>
+                        <span className="text-[#B3B3B3] text-[13px] hover:underline cursor-pointer truncate">${token.symbol}</span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${valid ? "bg-[#1DB954]/10 text-[#1DB954]" : "bg-[#FF3B5C]/10 text-[#FF3B5C]"}`}>
-                          {formatMcap(token.usd_market_cap)}
-                        </span>
-                        {!valid && <span title="Below $200K MCap or <24h old — betting disabled" className="text-[10px]">🔒</span>}
-                      </div>
-                      <span className="text-[#B3B3B3] text-[10px] font-medium">{formatAge(token.age_hours)}</span>
+                    
+                    <div className="hidden sm:block w-24 text-right text-[#B3B3B3] text-[13px]">
+                      {formatMcap(token.usd_market_cap)}
+                    </div>
+                    
+                    <div className="w-16 text-right text-[#B3B3B3] text-[13px] flex items-center justify-end gap-2">
+                       {!valid && <span title="Betting Disabled" className="text-xs">🔒</span>}
+                       {formatAge(token.age_hours)}
                     </div>
                   </button>
                 );
@@ -272,24 +272,100 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
         </div>
       </div>
 
-      {/* ── Chart iframe ── */}
-      <div className="flex-1 relative bg-[#121212] min-h-[500px]">
+      {/* ── Album Header ── */}
+      <div 
+        className="pt-24 px-6 pb-6"
+        style={{
+          background: "linear-gradient(180deg, #3E3E3E 0%, #121212 100%)"
+        }}
+      >
+        <div className="flex items-end gap-6 mt-4">
+          <div className="w-40 h-40 rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.5)] overflow-hidden bg-[#282828] flex items-center justify-center flex-shrink-0 relative group">
+            {selected?.image_uri ? (
+               // eslint-disable-next-line @next/next/no-img-element
+               <img src={selected.image_uri} alt="" className="w-full h-full object-cover" />
+            ) : (
+               <span className="text-4xl text-[#B3B3B3] opacity-30 font-bold uppercase">{selected?.symbol.slice(0, 2) || "?"}</span>
+            )}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={handleCopy}>
+               <span className="text-white font-bold text-sm">{copied ? "✓ COPIED CA" : "📋 COPY CA"}</span>
+            </div>
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <span className="text-white text-xs font-bold uppercase tracking-widest hidden sm:block">Verified Token</span>
+            <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tighter hover:underline cursor-pointer line-clamp-2 leading-tight">
+              {selected ? selected.name : "Select a Token"}
+            </h1>
+            
+            {selected && (
+              <div className="flex items-center gap-2 mt-2 text-sm text-[#B3B3B3] font-medium">
+                <span className="w-6 h-6 rounded-full overflow-hidden bg-black flex-shrink-0 flex items-center justify-center shadow-lg">
+                  <span className="text-[8px]">🦅</span>
+                </span>
+                <span className="font-bold text-white hover:underline cursor-pointer">DexScreener</span>
+                <span>•</span>
+                <span>{formatMcap(selected.usd_market_cap)} MC</span>
+                <span>•</span>
+                <span>{selected.age_hours > 24 ? `${Math.floor(selected.age_hours/24)} days` : `${Math.floor(selected.age_hours)} hours`}</span>
+                {!tokenIsValid(selected) && (
+                   <>
+                    <span>•</span>
+                    <span className="text-[#FF3B5C]">🔒 Lock</span>
+                   </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Play Controls Bar ── */}
+      <div className="px-6 py-4 flex items-center gap-6 bg-[#121212]">
+        <button 
+          className="w-14 h-14 bg-[#1DB954] rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-xl"
+          onClick={fetchDefaultTokens}
+          title="Refresh Data"
+        >
+          <svg fill="black" viewBox="0 0 24 24" className="w-7 h-7 ml-1"><path d="M8 5.14v14l11-7-11-7z"></path></svg>
+        </button>
+        
+        <button 
+          className={`text-3xl text-[#1DB954] hover:scale-110 transition-transform ${copied ? "opacity-50" : "opacity-100"}`}
+          onClick={handleCopy}
+          title="Copy Contract Address"
+        >
+          ⊕
+        </button>
+        
+        <button className="text-[#B3B3B3] hover:text-white transition-colors tracking-widest text-xl">
+          •••
+        </button>
+      </div>
+
+      {/* ── Chart iframe ("Lyrics" area) ── */}
+      <div className="flex-1 relative bg-[#121212] min-h-[400px]">
         {embedUrl ? (
-          <iframe
-            key={selected?.address}
-            src={embedUrl}
-            title={`${selected?.symbol} Chart`}
-            className="absolute inset-0 w-full h-full border-none"
-            allow="clipboard-write"
-          />
+          <>
+            <div className="absolute inset-x-6 inset-y-2 rounded-xl overflow-hidden border border-white/5">
+              <iframe
+                key={selected?.address}
+                src={embedUrl}
+                title={`${selected?.symbol} Chart`}
+                className="absolute inset-0 w-full h-full border-none"
+                allow="clipboard-write"
+              />
+            </div>
+          </>
         ) : (
           <div className="flex flex-col text-center items-center justify-center h-full text-[#B3B3B3]">
-            <span className="text-4xl mb-4 opacity-50">📈</span>
-            <div className="text-sm font-medium tracking-wide text-white mb-1">Select a token to view chart</div>
-            <div className="text-xs">Paste a contract address or search above to start</div>
+            <span className="text-4xl mb-4 opacity-30">🎵</span>
+            <div className="text-sm font-medium tracking-wide text-white mb-1">It&apos;s quiet here.</div>
+            <div className="text-xs">Search for a token to view the chart.</div>
           </div>
         )}
       </div>
+
     </div>
   );
 }

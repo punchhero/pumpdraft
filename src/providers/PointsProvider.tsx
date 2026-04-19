@@ -111,7 +111,7 @@ interface StoredState {
 }
 
 function getStorageKey(wallet: string) {
-    return `pumpdraft_state_${wallet}`;
+    return `pumpdraft_v2_${wallet}`;
 }
 
 function loadFromStorage(wallet: string): StoredState {
