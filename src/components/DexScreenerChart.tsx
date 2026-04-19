@@ -173,18 +173,10 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
     <div className="bg-[#121212] rounded-xl overflow-hidden shadow-2xl border border-white/5 flex flex-col h-full font-sans relative">
       
       {/* ── Top Header / Search Navbar ── */}
-      <div className="absolute top-0 left-0 right-0 z-10 pt-4 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center text-white/70 hover:text-white transition-colors">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11 2.207L9.793 1L3.146 7.646a.5.5 0 000 .708l6.647 6.646L11 13.793 5.207 8 11 2.207z"></path></svg>
-          </button>
-          <button className="w-8 h-8 rounded-full bg-black/40 xl:flex hidden items-center justify-center text-white/30 cursor-not-allowed">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M5 13.793l1.207 1.207 6.647-6.646a.5.5 0 000-.708L6.207 1 5 2.207 10.793 8 5 13.793z"></path></svg>
-          </button>
-        </div>
+      <div className="absolute top-0 left-0 right-0 z-10 pt-4 px-6 flex items-center justify-end">
 
         {/* Spotify Pill Search */}
-        <div className="flex-1 max-w-[400px] ml-4 relative" ref={wrapRef}>
+        <div className="max-w-[280px] w-full relative" ref={wrapRef}>
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                <svg fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" aria-hidden="true"><path d="M10.533 1.27893C5.35215 1.27893 1.12598 5.41887 1.12598 10.5579C1.12598 15.697 5.35215 19.8369 10.533 19.8369C12.767 19.8369 14.8235 19.0671 16.4402 17.7794L20.7929 22.132C21.1834 22.5226 21.8166 22.5226 22.2071 22.132C22.5976 21.7415 22.5976 21.1083 22.2071 20.7178L17.8634 16.3741C19.1833 14.7874 19.94 12.762 19.94 10.5579C19.94 5.41887 15.7138 1.27893 10.533 1.27893ZM3.12598 10.5579C3.12598 6.55226 6.42768 3.27893 10.533 3.27893C14.6383 3.27893 17.94 6.55226 17.94 10.5579C17.94 14.5636 14.6383 17.8369 10.533 17.8369C6.42768 17.8369 3.12598 14.5636 3.12598 10.5579Z"></path></svg>
@@ -287,8 +279,10 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
             ) : (
                <span className="text-4xl text-[#B3B3B3] opacity-30 font-bold uppercase">{selected?.symbol.slice(0, 2) || "?"}</span>
             )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={handleCopy}>
-               <span className="text-white font-bold text-sm">{copied ? "✓ COPIED CA" : "📋 COPY CA"}</span>
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={handleCopy}>
+               <span className="bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold px-3 py-1.5 rounded-full transition-colors shadow-lg">
+                 {copied ? "✓ Copied!" : "Copy CA"}
+               </span>
             </div>
           </div>
           
@@ -320,31 +314,10 @@ export default function DexScreenerChart({ onTokenChange }: DexScreenerChartProp
         </div>
       </div>
 
-      {/* ── Play Controls Bar ── */}
-      <div className="px-6 py-4 flex items-center gap-6 bg-[#121212]">
-        <button 
-          className="w-14 h-14 bg-[#1DB954] rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-xl"
-          onClick={fetchDefaultTokens}
-          title="Refresh Data"
-        >
-          <svg fill="black" viewBox="0 0 24 24" className="w-7 h-7 ml-1"><path d="M8 5.14v14l11-7-11-7z"></path></svg>
-        </button>
-        
-        <button 
-          className={`text-3xl text-[#1DB954] hover:scale-110 transition-transform ${copied ? "opacity-50" : "opacity-100"}`}
-          onClick={handleCopy}
-          title="Copy Contract Address"
-        >
-          ⊕
-        </button>
-        
-        <button className="text-[#B3B3B3] hover:text-white transition-colors tracking-widest text-xl">
-          •••
-        </button>
-      </div>
+
 
       {/* ── Chart iframe ("Lyrics" area) ── */}
-      <div className="flex-1 relative bg-[#121212] min-h-[400px]">
+      <div className="flex-1 relative bg-[#121212] min-h-[500px]">
         {embedUrl ? (
           <>
             <div className="absolute inset-x-6 inset-y-2 rounded-xl overflow-hidden border border-white/5">
