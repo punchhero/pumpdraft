@@ -5,13 +5,13 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pumpdraft = "PumpDraft1111111111111111111111111111111111"
+pumpdraft = "BLz3BRDWocq7uU6jTBsMwAenSsPNN8TvewfCaRELWk5r"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

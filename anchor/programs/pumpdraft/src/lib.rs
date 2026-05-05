@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("PumpDraft1111111111111111111111111111111111");
+declare_id!("BLz3BRDWocq7uU6jTBsMwAenSsPNN8TvewfCaRELWk5r");
 
 #[program]
 pub mod pumpdraft {

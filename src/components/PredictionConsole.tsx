@@ -164,7 +164,9 @@ export default function PredictionConsole({
             const amountLamports = new BN(Math.floor(amount * LAMPORTS_PER_SOL)); // Safe integer
 
             // 1. Automatically initialize market PDA if it doesn't exist
+            let isNewMarket = false;
             if (!marketInfo) {
+                isNewMarket = true;
                 addConsoleLine(`> INITIALIZING NEW MARKET ON-CHAIN...`, "text-terminal-amber");
                 const resolveTime = new BN(Math.floor(Date.now() / 1000) + (5 * 60)); // +5 mins fallback
                 const safeMcapInt = Math.floor(selectedToken.usd_market_cap ?? 0);
@@ -227,6 +229,15 @@ export default function PredictionConsole({
                 tx_signature: signature,
                 pool_id: poolId ?? null,
             });
+
+            // 5. If this was a new market, ping the House Bot to seed liquidity asynchronously
+            if (isNewMarket) {
+                fetch("/api/seed-pool", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ marketIdStr }),
+                }).catch(err => console.error("Failed to ping House Bot:", err));
+            }
 
             // 5. Award points and refresh balance
             addPoints(10, "BET_PLACED");

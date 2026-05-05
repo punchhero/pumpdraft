@@ -97,9 +97,14 @@ export async function POST(req: NextRequest) {
         const totalUp = parseFloat(pool.total_up_bets);
         const totalDown = parseFloat(pool.total_down_bets);
         const totalPool = totalUp + totalDown;
-        const platformFee = totalPool * PLATFORM_FEE_RATE;
-        const rewardPool = totalPool - platformFee;
+        const losingSideTotal = winningSide === "UP" ? totalDown : totalUp;
         const winningSideTotal = winningSide === "UP" ? totalUp : totalDown;
+
+        // Edge case: if there are NO losers (everyone bet the same direction),
+        // refund 100% of stakes — do NOT charge a fee on their own money.
+        const noLosers = losingSideTotal === 0;
+        const platformFee = noLosers ? 0 : totalPool * PLATFORM_FEE_RATE;
+        const rewardPool = noLosers ? totalPool : totalPool - platformFee;
 
         // 4. Update pool status
         await supabase

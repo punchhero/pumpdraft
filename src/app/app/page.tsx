@@ -8,11 +8,15 @@ import TokenSubmission from "@/components/TokenSubmission";
 import type { TokenInfo } from "@/components/DexScreenerChart";
 import { useAuth } from "@/providers/AuthProvider";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useBetResolver } from "@/hooks/useBetResolver";
 
 export default function AppDashboard() {
   const { user } = useAuth();
   const { connected } = useWallet();
   const [selectedToken, setSelectedToken] = useState<TokenInfo | null>(null);
+
+  // Auto-settle expired pools every 60s while user is on the page
+  useBetResolver();
 
   return (
     <div className="dash-root">
