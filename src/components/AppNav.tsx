@@ -8,6 +8,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { usePoints } from "@/providers/PointsProvider";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { PillLogo } from "@/components/FloatingPills";
+import { Droplet } from "lucide-react";
 
 export default function AppNav() {
   const pathname = usePathname();
@@ -105,7 +106,12 @@ export default function AppNav() {
                 disabled={airdropStatus === "loading"}
                 className={`appnav-airdrop ${airdropStatus}`}
               >
-                {airdropStatus === "idle"    && "💧 Fund Wallet"}
+                {airdropStatus === "idle"    && (
+                  <span className="flex items-center gap-1.5">
+                    <Droplet className="w-3.5 h-3.5 text-blue-400" />
+                    Fund Wallet
+                  </span>
+                )}
                 {airdropStatus === "loading" && "Requesting…"}
                 {airdropStatus === "success" && "✓ +1 SOL"}
                 {airdropStatus === "error"   && "Rate limited"}
