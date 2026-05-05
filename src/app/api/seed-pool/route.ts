@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { Program, AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
 import BN from "bn.js";
 import bs58 from "bs58";
 import idl from "@/lib/pumpdraft.json";
@@ -10,6 +10,19 @@ export const dynamic = "force-dynamic";
 const PROGRAM_ID = new PublicKey("BLz3BRDWocq7uU6jTBsMwAenSsPNN8TvewfCaRELWk5r");
 const SEED_AMOUNT_SOL = 0.25;
 const LAMPORTS_PER_SOL = 1_000_000_000;
+
+class NodeWallet {
+  constructor(readonly payer: Keypair) {}
+  get publicKey(): PublicKey { return this.payer.publicKey; }
+  async signTransaction(tx: Transaction): Promise<Transaction> {
+    tx.partialSign(this.payer);
+    return tx;
+  }
+  async signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
+    txs.forEach((tx) => tx.partialSign(this.payer));
+    return txs;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,7 +59,7 @@ export async function POST(req: NextRequest) {
     // 2. Setup Wallet UP and execute
     try {
       const keypairUp = Keypair.fromSecretKey(bs58.decode(keyUpStr));
-      const walletUp = new Wallet(keypairUp);
+      const walletUp = new NodeWallet(keypairUp);
       const providerUp = new AnchorProvider(connection, walletUp, { preflightCommitment: "processed" });
       const programUp = new Program(idl as any, PROGRAM_ID, providerUp);
 
@@ -76,7 +89,7 @@ export async function POST(req: NextRequest) {
     // 3. Setup Wallet DOWN and execute
     try {
       const keypairDown = Keypair.fromSecretKey(bs58.decode(keyDownStr));
-      const walletDown = new Wallet(keypairDown);
+      const walletDown = new NodeWallet(keypairDown);
       const providerDown = new AnchorProvider(connection, walletDown, { preflightCommitment: "processed" });
       const programDown = new Program(idl as any, PROGRAM_ID, providerDown);
 
