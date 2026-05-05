@@ -8,10 +8,10 @@
 
 :root {
   /* ── Backgrounds (Spotify-inspired dark layers) */
-  --bg-base:      #121212;
-  --bg-card:      #181818;
-  --bg-elevated:  #242424;
-  --bg-hover:     #2a2a2a;
+  --bg-base:      #000000;
+  --bg-card:      #121212;
+  --bg-elevated:  #1A1A1A;
+  --bg-hover:     #242424;
   --bg-active:    #333333;
 
   /* ── Pump.fun Mint Green */
