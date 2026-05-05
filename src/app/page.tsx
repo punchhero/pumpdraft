@@ -40,7 +40,7 @@ export default function LandingPage() {
         <div className="hero-inner animate-fade-up">
           <div className="hero-eyebrow">
             <span className="hero-eyebrow-dot" />
-            Powered by Pump.fun · Solana
+            LIVE ON SOLANA DEVNET
           </div>
 
           <h1 className="hero-title">

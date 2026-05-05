@@ -4,6 +4,7 @@ import "./globals.css";
 import SolanaProvider from "@/providers/SolanaProvider";
 import AuthProvider from "@/providers/AuthProvider";
 import PointsProvider from "@/providers/PointsProvider";
+import Footer from "@/components/Footer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,7 +30,10 @@ export default function RootLayout({
         <SolanaProvider>
           <AuthProvider>
             <PointsProvider>
-              {children}
+              <div className="flex flex-col min-h-screen">
+                {children}
+                <Footer />
+              </div>
             </PointsProvider>
           </AuthProvider>
         </SolanaProvider>
