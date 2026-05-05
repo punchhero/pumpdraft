@@ -12,6 +12,18 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="landing">
+      {/* ── Announcement Banner ─────────────────────── */}
+      <div className="w-full bg-[#00D16C]/10 border-b border-[#00D16C]/20 py-2.5 px-4 flex items-center justify-center gap-3 z-50 relative">
+        <span className="text-[#00D16C] font-semibold text-sm tracking-wide">
+          🏆 3-Week Campaign: 100 SOL in Rewards
+        </span>
+        <Link 
+          href="/app" 
+          className="bg-[#00D16C] hover:bg-[#00B85E] text-black text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider transition-colors"
+        >
+          bet memes
+        </Link>
+      </div>
 
       {/* ── Navbar ─────────────────────────────── */}
       <nav className="landing-nav">

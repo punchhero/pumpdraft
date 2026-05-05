@@ -9,6 +9,12 @@ export default function Footer() {
           <span className="text-white text-xs font-semibold tracking-widest uppercase">PumpDraft</span>
           <span className="text-[#B3B3B3] text-xs">© 2026</span>
         </div>
+
+        {/* Contract Address Section */}
+        <div className="hidden md:flex items-center gap-2 bg-[#121212] px-3 py-1.5 rounded-md border border-white/10">
+          <span className="text-[10px] text-[#6B6B6B] uppercase font-bold tracking-wider">CA:</span>
+          <span className="text-xs font-mono text-[#00D16C]">PASTE_YOUR_CA_HERE</span>
+        </div>
         
         <div className="flex items-center gap-6">
           <Link href="/terms" className="text-xs text-[#B3B3B3] hover:text-white transition-colors">
